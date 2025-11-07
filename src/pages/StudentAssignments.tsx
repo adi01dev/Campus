@@ -3,15 +3,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Upload, Clock, CheckCircle, AlertCircle, Search, Calendar } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { FileText, Upload, Clock, CheckCircle, AlertCircle, Search, Calendar, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const StudentAssignments = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedAssignment, setSelectedAssignment] = useState<typeof assignments[0] | null>(null);
+  const [submissionDialog, setSubmissionDialog] = useState(false);
+  const [submittingAssignment, setSubmittingAssignment] = useState<typeof assignments[0] | null>(null);
+  const [submissionText, setSubmissionText] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const assignments = [
+  const [assignments, setAssignments] = useState([
     {
       id: 1,
       title: "Data Structures - Binary Trees",
@@ -21,6 +33,8 @@ const StudentAssignments = () => {
       marks: 25,
       submittedOn: null,
       grade: null,
+      submissionText: null,
+      submissionFile: null,
     },
     {
       id: 2,
@@ -31,6 +45,8 @@ const StudentAssignments = () => {
       marks: 30,
       submittedOn: "2024-03-10",
       grade: null,
+      submissionText: "Completed all circuit diagrams",
+      submissionFile: "circuit_analysis.pdf",
     },
     {
       id: 3,
@@ -41,6 +57,8 @@ const StudentAssignments = () => {
       marks: 20,
       submittedOn: "2024-03-07",
       grade: "18/20",
+      submissionText: "All problems solved",
+      submissionFile: "thermodynamics.pdf",
     },
     {
       id: 4,
@@ -51,8 +69,10 @@ const StudentAssignments = () => {
       marks: 40,
       submittedOn: null,
       grade: null,
+      submissionText: null,
+      submissionFile: null,
     },
-  ];
+  ]);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", icon: any }> = {
@@ -79,6 +99,64 @@ const StudentAssignments = () => {
   const pendingAssignments = filteredAssignments.filter(a => a.status === "pending");
   const submittedAssignments = filteredAssignments.filter(a => a.status === "submitted");
   const gradedAssignments = filteredAssignments.filter(a => a.status === "graded");
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 100 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select a file smaller than 100MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleSubmitAssignment = () => {
+    if (!submittingAssignment) return;
+    
+    setUploading(true);
+    
+    // Simulate upload delay
+    setTimeout(() => {
+      // Update assignment status in local state
+      setAssignments(prev => prev.map(assignment => 
+        assignment.id === submittingAssignment.id
+          ? {
+              ...assignment,
+              status: "submitted",
+              submittedOn: new Date().toISOString().split('T')[0],
+              submissionText: submissionText || null,
+              submissionFile: selectedFile?.name || null,
+            }
+          : assignment
+      ));
+
+      toast({
+        title: "Success!",
+        description: "Assignment submitted successfully",
+      });
+
+      // Reset form
+      setSubmissionDialog(false);
+      setSubmittingAssignment(null);
+      setSubmissionText("");
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      
+      setUploading(false);
+    }, 1000);
+  };
+
+  const openSubmissionDialog = (assignment: typeof assignments[0]) => {
+    setSubmittingAssignment(assignment);
+    setSubmissionDialog(true);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-primary/5 p-6">
@@ -193,12 +271,12 @@ const StudentAssignments = () => {
                   </div>
                   <div className="flex gap-2">
                     {assignment.status === "pending" && (
-                      <Button className="gap-2">
+                      <Button className="gap-2" onClick={() => openSubmissionDialog(assignment)}>
                         <Upload className="h-4 w-4" />
                         Submit Assignment
                       </Button>
                     )}
-                    <Button variant="outline">View Details</Button>
+                    <Button variant="outline" onClick={() => setSelectedAssignment(assignment)}>View Details</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -215,7 +293,7 @@ const StudentAssignments = () => {
                 <CardContent>
                   <div className="flex justify-between items-center">
                     <span>Due: {new Date(assignment.dueDate).toLocaleDateString('en-IN')}</span>
-                    <Button className="gap-2">
+                     <Button className="gap-2" onClick={() => openSubmissionDialog(assignment)}>
                       <Upload className="h-4 w-4" />
                       Submit
                     </Button>
@@ -260,6 +338,206 @@ const StudentAssignments = () => {
             ))}
           </TabsContent>
         </Tabs>
+
+        {/* Submission Dialog */}
+        <Dialog open={submissionDialog} onOpenChange={setSubmissionDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5 text-primary" />
+                Submit Assignment
+              </DialogTitle>
+              <DialogDescription>
+                {submittingAssignment?.title} - {submittingAssignment?.subject}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="submission-text">Submission Notes (Optional)</Label>
+                <Textarea
+                  id="submission-text"
+                  placeholder="Add any notes or comments about your submission..."
+                  value={submissionText}
+                  onChange={(e) => setSubmissionText(e.target.value)}
+                  rows={4}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="file-upload">Upload File</Label>
+                <div className="flex gap-2 cursor-pointer">
+                  <Input
+                    id="file-upload"
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileSelect}
+                    accept=".pdf,.doc,.docx,.txt,.zip,.rar"
+                    className="flex-1 cursor-pointer"
+                  />
+                  {selectedFile && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {selectedFile && (
+                  <p className="text-sm text-muted-foreground">
+                    Selected: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Accepted formats: PDF, DOC, DOCX, TXT, ZIP, RAR (Max 100MB)
+                </p>
+              </div>
+
+              <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                <p className="text-sm font-medium">Assignment Details</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Due Date:</span>
+                    <span className="ml-2 font-medium">
+                      {submittingAssignment && new Date(submittingAssignment.dueDate).toLocaleDateString('en-IN')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total Marks:</span>
+                    <span className="ml-2 font-medium">{submittingAssignment?.marks}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSubmissionDialog(false);
+                    setSubmissionText("");
+                    setSelectedFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = "";
+                    }
+                  }}
+                  disabled={uploading}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSubmitAssignment}
+                  disabled={uploading || (!submissionText && !selectedFile)}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  {uploading ? "Submitting..." : "Submit Assignment"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assignment Details Dialog */}
+        <Dialog open={!!selectedAssignment} onOpenChange={() => setSelectedAssignment(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                {selectedAssignment?.title}
+              </DialogTitle>
+              <DialogDescription>{selectedAssignment?.subject}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Status</p>
+                  <div className="mt-1">{selectedAssignment && getStatusBadge(selectedAssignment.status)}</div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Due Date</p>
+                  <p className="mt-1 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    {selectedAssignment && new Date(selectedAssignment.dueDate).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total Marks</p>
+                  <p className="mt-1 text-lg font-semibold">{selectedAssignment?.marks}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Grade</p>
+                  <p className="mt-1 text-lg font-semibold">{selectedAssignment?.grade || 'Not graded yet'}</p>
+                </div>
+              </div>
+
+              {selectedAssignment?.submittedOn && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Submitted On</p>
+                  <p className="mt-1">
+                    {new Date(selectedAssignment.submittedOn).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Assignment Description</p>
+                <Card className="bg-muted/50">
+                  <CardContent className="pt-4">
+                    <p className="text-sm">
+                      This assignment covers the fundamental concepts and practical applications. 
+                      Complete all questions and submit before the deadline. Late submissions may incur penalties.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {selectedAssignment?.status === "graded" && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Feedback</p>
+                  <Card className="bg-muted/50">
+                    <CardContent className="pt-4">
+                      <p className="text-sm">
+                        Good work! Your understanding of the concepts is clear. Keep up the effort.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                {selectedAssignment?.status === "pending" && (
+                  <Button 
+                    className="gap-2" 
+                    onClick={() => {
+                      openSubmissionDialog(selectedAssignment);
+                      setSelectedAssignment(null);
+                    }}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Submit Assignment
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setSelectedAssignment(null)}>Close</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
