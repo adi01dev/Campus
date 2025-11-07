@@ -1,6 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { QrCode } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import QrReader from "react-qr-reader-es6"; // npm install react-qr-reader
+import { useState } from "react";
 import { Progress } from '@/components/ui/progress';
 import { 
   BookOpen, 
@@ -18,6 +22,8 @@ import {
   GraduationCap,
   Target
 } from 'lucide-react';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
 const StudentDashboard = () => {
   const quickStats = [
@@ -46,6 +52,38 @@ const StudentDashboard = () => {
     { subject: 'Software Engineering', attended: 22, total: 25, percentage: 88 },
     { subject: 'Machine Learning', attended: 18, total: 20, percentage: 90 },
   ];
+
+  const [scanOpen, setScanOpen] = useState(false);
+  const { toast } = useToast();
+  const token = localStorage.getItem("accessToken");
+
+  const handleScan = async (qrToken: string | null) => {
+    if (!qrToken) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/student/attendance/mark`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ qrToken }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message);
+      toast({ title: "Attendance Marked", description: data.message });
+      setScanOpen(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleError = (err: any) => {
+    toast({ title: "Scan Error", description: err.message, variant: "destructive" });
+  };
+
 
   return (
     <div className="space-y-6">
@@ -198,7 +236,45 @@ const StudentDashboard = () => {
           </Card>
         </div>
       </div>
+      <Card
+        onClick={() => setScanOpen(true)}
+        className="glass-effect border-0 shadow-card hover:shadow-elegant transition-all cursor-pointer"
+      >
+        <CardContent className="p-6 text-center">
+          <div className="bg-gradient-secondary p-3 rounded-full w-fit mx-auto mb-4">
+            <QrCode className="w-6 h-6 text-white" />
+          </div>
+          <h3 className="font-semibold text-foreground mb-2">Scan Attendance QR</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Use camera to scan faculty’s QR code
+          </p>
+          <Button variant="outline" className="w-full">
+            Start Scanner
+          </Button>
+        </CardContent>
+      </Card>
 
+      {/* QR Scanner Modal */}
+      {scanOpen && (
+        <div className="fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50">
+          <h2 className="text-white text-xl font-semibold mb-3">Scan Attendance QR</h2>
+          <div className="w-72 h-72 bg-white p-2 rounded-lg">
+            <QrReader
+              delay={300}
+              onError={handleError}
+              onScan={handleScan}
+              style={{ width: "100%", height: "100%" }}
+            />
+          </div>
+          <Button
+            variant="secondary"
+            className="mt-4"
+            onClick={() => setScanOpen(false)}
+          >
+            Close
+          </Button>
+        </div>
+      )}
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="glass-effect border-0 shadow-card hover:shadow-elegant transition-all cursor-pointer">

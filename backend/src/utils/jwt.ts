@@ -6,7 +6,7 @@ export const signAccessToken = (payload: object) => {
 };
 
 export const verifyAccessToken = (token: string) => {
-  return jwt.verify(token, JWT_SECRET);
+  return jwt.verify(token, JWT_SECRET as string);
 };
 
 export const signRefreshToken = (payload: object) => {

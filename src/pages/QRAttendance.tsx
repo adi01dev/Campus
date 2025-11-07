@@ -8,10 +8,21 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { QrCode, Scan, Users, Clock, Calendar, Download, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
+import { QRCodeCanvas } from 'qrcode.react';
+
 
 const QRAttendance = () => {
-  const [selectedSubject, setSelectedSubject] = useState('');
-  const [selectedSession, setSelectedSession] = useState('');
+  const { toast } = useToast();
+
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedSession, setSelectedSession] = useState("");
+  const [duration, setDuration] = useState("60");
+  const [qrToken, setQrToken] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const token = localStorage.getItem("accessToken");
 
   const todaysSessions = [
     {
@@ -58,6 +69,54 @@ const QRAttendance = () => {
 
   const subjects = ['Data Structures', 'Machine Learning', 'Database Systems', 'Algorithms'];
 
+  const handleGenerateQR = async () => {
+    if (!selectedSubject || !selectedSession) {
+      toast({
+        title: "Missing Details",
+        description: "Please select a subject and session type.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch(`http://localhost:4000/api/faculty/attendance/create-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          course: selectedSubject,
+          sessionType: selectedSession,
+          duration: parseInt(duration),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message);
+
+      setQrToken(data.session.qrToken);
+      setExpiresAt(data.session.expiresAt);
+
+      toast({
+        title: "QR Code Generated",
+        description: `QR for ${selectedSubject} (${selectedSession}) created successfully.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to generate QR code.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   return (
     <motion.div 
       className="space-y-6 p-6"
@@ -74,11 +133,15 @@ const QRAttendance = () => {
           </h1>
           <p className="text-muted-foreground mt-2">Generate QR codes and track attendance digitally</p>
         </div>
-        <Button className="glass-card">
+        <Button className="glass-card"
+          onClick={handleGenerateQR}
+          disabled={loading}
+        >
           <QrCode className="w-4 h-4 mr-2" />
-          Generate New QR
+          {loading ? "Generating..." : "Generate New QR"}
         </Button>
       </div>
+      
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <motion.div
@@ -198,18 +261,43 @@ const QRAttendance = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="duration">Duration (minutes)</Label>
-                <Input id="duration" type="number" placeholder="60" defaultValue="60" />
+                <Input id="duration" type="number" placeholder="60" value={duration} onChange={(e) => setDuration(e.target.value)}/>
               </div>
 
-              <div className="p-6 bg-background/50 rounded-lg text-center border-2 border-dashed">
-                <QrCode className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">QR Code will appear here</p>
-              </div>
 
-              <Button className="w-full glass-card">
-                <QrCode className="w-4 h-4 mr-2" />
-                Generate QR Code
-              </Button>
+
+<div className="p-6 bg-background/50 rounded-lg text-center border-2 border-dashed">
+  {qrToken ? (
+    <>
+      <QRCodeCanvas 
+        value={qrToken} 
+        size={160} 
+        includeMargin={true} 
+        className="mx-auto mb-4"
+      />
+      <p className="text-sm font-medium text-green-600">QR Code Active</p>
+      {expiresAt && (
+        <p className="text-xs text-muted-foreground mt-1">
+          Expires at: {new Date(expiresAt).toLocaleTimeString()}
+        </p>
+      )}
+    </>
+  ) : (
+    <>
+      <QrCode className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">QR Code will appear here</p>
+    </>
+  )}
+</div>
+
+
+        <Button className="glass-card"
+          onClick={handleGenerateQR}
+          disabled={loading}
+        >
+          <QrCode className="w-4 h-4 mr-2" />
+          {loading ? "Generating..." : "Generate New QR"}
+        </Button>
             </CardContent>
           </Card>
         </motion.div>

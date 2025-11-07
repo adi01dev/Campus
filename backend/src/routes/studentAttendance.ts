@@ -9,12 +9,13 @@ const router = express.Router();
 
 // 📱 Student scans QR → marks attendance
 router.post("/mark", authenticate, requireRole("Student"), async (req, res) => {
+  console.log("Decoded user:", req.user);
   try {
     const { qrToken } = req.body;
     if (!qrToken) return res.status(400).json({ message: "QR Token missing" });
 
     const decoded = verifyQRToken(qrToken) as any;
-    const studentId = (req.user as any)._id;
+    const studentId = (req.user as any).id;
 
     const session = await AttendanceSession.findOne({
       qrToken,
@@ -31,9 +32,11 @@ router.post("/mark", authenticate, requireRole("Student"), async (req, res) => {
 
     res.json({ message: "Attendance marked successfully", record });
   } catch (err: any) {
+    console.error("mark: ",err);
     if (err.code === 11000) {
       return res.status(400).json({ message: "Already marked attendance" });
     }
+    
     res.status(500).json({ message: err.message });
   }
 });
