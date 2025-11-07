@@ -140,7 +140,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             </div>
             <div className="border-t border-border mt-8 pt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                © 2024 CampusConnect ERP. All Rights Reserved | Version 2.1.0
+                © 2025 CampusConnect ERP. All Rights Reserved | Version 2.1.0
               </p>
             </div>
           </footer>

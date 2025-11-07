@@ -6,6 +6,10 @@ import { useToast } from "@/hooks/use-toast";
 import QrReader from "react-qr-reader-es6"; // npm install react-qr-reader
 import { useState } from "react";
 import { Progress } from '@/components/ui/progress';
+import AIAssistant from '../AIAssistant';
+import MoURequests from '../MoURequests';
+import FeePayment from '../FeePayment';
+import { Link } from 'react-router-dom';
 import { 
   BookOpen, 
   Calendar, 
@@ -91,7 +95,7 @@ const StudentDashboard = () => {
       <div className="bg-gradient-hero rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Welcome Back, Aarav Patel</h1>
+            <h1 className="text-3xl font-bold mb-2">Welcome Back . . . </h1>
             <p className="text-white/80 text-lg">
               Ready to continue your learning journey? You have 3 assignments due this week.
             </p>
@@ -284,9 +288,12 @@ const StudentDashboard = () => {
             </div>
             <h3 className="font-semibold text-foreground mb-2">Pay Fees</h3>
             <p className="text-sm text-muted-foreground mb-4">Semester fee payment due in 15 days</p>
+            
+            <Link to="/fee-payment">
             <Button variant="outline" className="w-full">
               Pay Now
             </Button>
+            </Link>
           </CardContent>
         </Card>
 
@@ -297,9 +304,11 @@ const StudentDashboard = () => {
             </div>
             <h3 className="font-semibold text-foreground mb-2">AI Study Helper</h3>
             <p className="text-sm text-muted-foreground mb-4">Get personalized course recommendations</p>
+            <Link to="/ai-assistant">
             <Button variant="outline" className="w-full">
               Explore
             </Button>
+            </Link>
           </CardContent>
         </Card>
 
@@ -310,9 +319,12 @@ const StudentDashboard = () => {
             </div>
             <h3 className="font-semibold text-foreground mb-2">MoU Requests</h3>
             <p className="text-sm text-muted-foreground mb-4">Submit memorandum requests to faculty</p>
+            <Link to="/mou-requests"
+            > 
             <Button variant="outline" className="w-full">
               Submit Request
             </Button>
+            </Link>
           </CardContent>
         </Card>
       </div>
