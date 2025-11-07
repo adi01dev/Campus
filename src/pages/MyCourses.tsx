@@ -49,7 +49,7 @@ const MyCourses = () => {
       instructor: "Dr. Priya Sharma",
       semester: "6th Semester",
       progress: 85,
-      grade: "A-",
+      grade: "A+",
       status: "active",
       nextClass: "Tomorrow 9:00 AM",
       assignments: 2,
@@ -58,28 +58,11 @@ const MyCourses = () => {
       description:
         "Advanced data structures, algorithm analysis, and problem-solving techniques",
       materialsLink:
-        "https://drive.google.com/file/d/1uH1ITYp5G5AdGEt--KyuV-l4Pr8QWgRu/view?usp=drive_link",
+        "https://drive.google.com/file/d/1j1YeVU0UmTNZ3ks86TEa1KCiQsd8q9-k/view?usp=sharing",
     },
+    
     {
       id: 2,
-      title: "Database Management Systems",
-      code: "CS302",
-      instructor: "Prof. Rajesh Kumar",
-      semester: "6th Semester",
-      progress: 72,
-      grade: "B+",
-      status: "active",
-      nextClass: "Today 2:00 PM",
-      assignments: 1,
-      materials: 18,
-      videos: 8,
-      description:
-        "Relational databases, SQL, normalization, and database design principles",
-      materialsLink:
-        "https://drive.google.com/file/d/1uH1ITYp5G5AdGEt--KyuV-l4Pr8QWgRu/view?usp=drive_link",
-    },
-    {
-      id: 3,
       title: "Software Engineering",
       code: "CS303",
       instructor: "Dr. Anita Singh",
@@ -93,10 +76,10 @@ const MyCourses = () => {
       videos: 15,
       description:
         "Software development lifecycle, methodologies, and project management",
-      materialsLink: "https://drive.google.com/drive/folders/1DBMSExampleLink",
+      materialsLink: "https://drive.google.com/file/d/1fSX-zMg_dH1Y4_mJtgBY9DBtdNkz_mIQ/view?usp=drive_link",
     },
     {
-      id: 4,
+      id: 3,
       title: "Machine Learning",
       code: "CS304",
       instructor: "Prof. Vikram Gupta",
@@ -110,10 +93,10 @@ const MyCourses = () => {
       videos: 20,
       description:
         "Introduction to ML algorithms, neural networks, and practical applications",
-      materialsLink: "https://drive.google.com/drive/folders/1DBMSExampleLink",
+      materialsLink: "https://drive.google.com/file/d/1xerMgzaFYxMcLD6GYZXROV3btw7M2Laa/view?usp=sharing",
     },
     {
-      id: 5,
+      id: 4,
       title: "Operating Systems",
       code: "CS205",
       instructor: "Dr. Neha Patel",
@@ -128,7 +111,7 @@ const MyCourses = () => {
       description:
         "Process management, memory management, and system programming",
       materialsLink:
-        "https://drive.google.com/file/d/1uH1ITYp5G5AdGEt--KyuV-l4Pr8QWgRu/view?usp=drive_link",
+        "https://drive.google.com/file/d/16LjH9bbJvOO-egwrpO8evFnu-TPGgrHq/view?usp=sharing",
     },
   ];
 

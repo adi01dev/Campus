@@ -67,8 +67,6 @@ app.use("/api/queries", queryRoutes);
 
 app.get("/", (_req, res) => res.send("CampusConnect Backend Running"));
 
-
-app.listen(process.env.PORT || 5000, () => console.log("🚀 MoU backend running"));
 app.use('/api/auth', authRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
