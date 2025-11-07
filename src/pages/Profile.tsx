@@ -27,7 +27,8 @@ const Profile = () => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
 
-  const userStr = localStorage.getItem('campusConnectUser');
+  const userStr = localStorage.getItem('user');
+  console.log(userStr);
   const user = userStr ? JSON.parse(userStr) : null;
 
   if (!user) return null;

@@ -67,6 +67,7 @@ app.use("/api/queries", queryRoutes);
 
 app.get("/", (_req, res) => res.send("CampusConnect Backend Running"));
 
+
 app.use('/api/auth', authRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
