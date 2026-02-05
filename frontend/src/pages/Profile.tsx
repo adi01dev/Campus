@@ -128,7 +128,8 @@ const Profile = () => {
   };
 
   const getRoleSpecificContent = () => {
-    switch (user.role.toLowerCase()) {
+    const role = user?.role?.toLowerCase() || '';
+    switch (role) {
       case 'student':
         return {
           stats: [
@@ -138,7 +139,7 @@ const Profile = () => {
             { label: 'Subjects', value: '6', icon: BookOpen, color: 'text-primary' } // Calculated or static
           ],
           achievements: user.achievements || [
-            { title: 'Joined College', description: 'Started academic journey', date: new Date(user.createdAt).toLocaleDateString() }
+            { title: 'Joined College', description: 'Started academic journey', date: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A' }
           ],
           recentActivities: [ // Placeholder for now or fetch activity logs
             'Logged in successfully',
@@ -174,7 +175,7 @@ const Profile = () => {
             <div className="relative">
               <Avatar className="w-24 h-24">
                 <AvatarFallback className="bg-gradient-primary text-primary-foreground text-2xl">
-                  {user.name.split(' ').map((n: string) => n[0]).join('')}
+                  {user?.name ? user.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
                 </AvatarFallback>
               </Avatar>
               <Button
@@ -190,27 +191,27 @@ const Profile = () => {
             <div className="flex-1 space-y-4">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold">{user.name}</h1>
+                  <h1 className="text-3xl font-bold">{user?.name || 'User'}</h1>
                   <Badge variant="secondary" className="capitalize">
-                    {user.role}
+                    {user?.role || 'Guest'}
                   </Badge>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
-                    {user.email}
+                    {user?.email || 'No Email'}
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4" />
-                    {user.phone || 'N/A'}
+                    {user?.phone || 'N/A'}
                   </div>
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    {user.address ? user.address.split(',')[0] : 'Location N/A'}
+                    {user?.address ? user.address.split(',')[0] : 'Location N/A'}
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    Joined {new Date(user.createdAt).toLocaleDateString()}
+                    Joined {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                   </div>
                 </div>
               </div>
