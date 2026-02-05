@@ -1,15 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
   Calendar,
   BookOpen,
   Trophy,
@@ -21,24 +21,108 @@ import {
   Star,
   TrendingUp
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
 const Profile = () => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
-  const userStr = localStorage.getItem('user');
-  console.log(userStr);
-  const user = userStr ? JSON.parse(userStr) : null;
+  // Use state for loading
+  const [loading, setLoading] = useState(true);
 
-  if (!user) return null;
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data);
+          // Update local storage to keep sync
+          localStorage.setItem('user', JSON.stringify(data));
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, []);
 
-  const handleEditProfile = () => {
+  if (loading) return <div>Loading Profile...</div>;
+  if (!user) return <div>Please log in</div>;
+
+  // State for form inputs
+  const [formData, setFormData] = useState<any>({});
+
+  // When entering edit mode, populate form data
+  const handleEditToggle = () => {
+    if (!isEditing) {
+      setFormData({
+        phone: user.phone || '',
+        address: user.address || '',
+        dob: user.dob || '',
+        bloodGroup: user.bloodGroup || '',
+        fatherName: user.fatherName || '',
+        motherName: user.motherName || '',
+        emergencyContact: user.emergencyContact || '',
+        bio: user.bio || '',
+        gender: user.gender || ''
+      });
+    }
     setIsEditing(!isEditing);
-    if (isEditing) {
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev: any) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveProfile = async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (res.ok) {
+        const updatedUser = await res.json();
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser)); // Update local storage
+        setIsEditing(false);
+        toast({
+          title: "Profile Updated",
+          description: "Your personal information has been updated successfully.",
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: "Update Failed",
+          description: "Could not update profile. Please try again."
+        });
+      }
+    } catch (error) {
+      console.error("Profile update error", error);
       toast({
-        title: "Profile Updated",
-        description: "Your profile changes have been saved successfully.",
+        variant: 'destructive',
+        title: "Error",
+        description: "Something went wrong."
       });
     }
   };
@@ -48,78 +132,34 @@ const Profile = () => {
       case 'student':
         return {
           stats: [
-            { label: 'Current CGPA', value: '8.7', icon: GraduationCap, color: 'text-success' },
-            { label: 'Semester', value: '6th', icon: Calendar, color: 'text-primary' },
-            { label: 'Attendance', value: '92%', icon: Clock, color: 'text-success' },
-            { label: 'Subjects', value: '6', icon: BookOpen, color: 'text-primary' }
+            { label: 'Current CGPA', value: user.cgpa || 'N/A', icon: GraduationCap, color: 'text-success' },
+            { label: 'Semester', value: user.semester || 'N/A', icon: Calendar, color: 'text-primary' },
+            { label: 'Attendance', value: user.attendance || '0%', icon: Clock, color: 'text-success' },
+            { label: 'Subjects', value: '6', icon: BookOpen, color: 'text-primary' } // Calculated or static
           ],
-          achievements: [
-            { title: 'Dean\'s List', description: '5th Semester Academic Excellence', date: 'Dec 2023' },
-            { title: 'Coding Competition Winner', description: 'IntraCollege Hackathon 2023', date: 'Nov 2023' },
-            { title: 'Perfect Attendance', description: '4th Semester', date: 'May 2023' }
+          achievements: user.achievements || [
+            { title: 'Joined College', description: 'Started academic journey', date: new Date(user.createdAt).toLocaleDateString() }
           ],
-          recentActivities: [
-            'Submitted Data Structures Assignment',
-            'Attended AI/ML Seminar',
-            'Participated in Code Review Session'
+          recentActivities: [ // Placeholder for now or fetch activity logs
+            'Logged in successfully',
+            'Viewed Dashboard'
           ]
         };
       case 'faculty':
         return {
           stats: [
-            { label: 'Teaching Experience', value: '8 yrs', icon: GraduationCap, color: 'text-primary' },
-            { label: 'Subjects Teaching', value: '4', icon: BookOpen, color: 'text-primary' },
-            { label: 'Student Rating', value: '4.8/5', icon: Star, color: 'text-success' },
-            { label: 'Research Papers', value: '12', icon: Trophy, color: 'text-success' }
+            { label: 'Teaching Experience', value: user.experience || 'N/A', icon: GraduationCap, color: 'text-primary' },
+            { label: 'Subjects Teaching', value: user.subjects?.length?.toString() || '0', icon: BookOpen, color: 'text-primary' },
+            { label: 'Student Rating', value: user.rating || 'N/A', icon: Star, color: 'text-success' },
+            // Research papers - add to model if needed
+            { label: 'Designation', value: user.designation || 'Faculty', icon: Trophy, color: 'text-success' }
           ],
-          achievements: [
-            { title: 'Best Teacher Award', description: 'Excellence in Computer Science Education', date: 'Dec 2023' },
-            { title: 'Research Grant', description: 'AI in Education - ₹5,00,000', date: 'Sep 2023' },
-            { title: 'Published Paper', description: 'IEEE Conference on Machine Learning', date: 'Aug 2023' }
-          ],
-          recentActivities: [
-            'Updated course curriculum for AI/ML',
-            'Conducted student performance review',
-            'Attended faculty development program'
-          ]
-        };
-      case 'principal':
-        return {
-          stats: [
-            { label: 'Total Students', value: '1,250', icon: Users, color: 'text-primary' },
-            { label: 'Faculty Members', value: '85', icon: GraduationCap, color: 'text-primary' },
-            { label: 'Placement Rate', value: '95%', icon: TrendingUp, color: 'text-success' },
-            { label: 'Institute Rating', value: 'A+', icon: Star, color: 'text-success' }
-          ],
-          achievements: [
-            { title: 'NAAC A+ Rating', description: 'Institutional Excellence Recognition', date: 'Jan 2024' },
-            { title: 'Best Placement Record', description: 'State University Recognition', date: 'Dec 2023' },
-            { title: 'Innovation Award', description: 'Educational Technology Integration', date: 'Oct 2023' }
-          ],
-          recentActivities: [
-            'Approved new AI/ML curriculum',
-            'Visited industry partnership meeting',
-            'Reviewed annual budget proposals'
-          ]
+          achievements: user.achievements || [],
+          recentActivities: []
         };
       default:
-        return {
-          stats: [
-            { label: 'Experience', value: '5 yrs', icon: Calendar, color: 'text-primary' },
-            { label: 'Department', value: user.role, icon: Users, color: 'text-primary' },
-            { label: 'Projects', value: '15', icon: BookOpen, color: 'text-success' },
-            { label: 'Rating', value: '4.5/5', icon: Star, color: 'text-success' }
-          ],
-          achievements: [
-            { title: 'Employee of the Month', description: 'Outstanding Performance', date: 'Dec 2023' },
-            { title: 'Process Improvement', description: 'Streamlined Operations', date: 'Nov 2023' }
-          ],
-          recentActivities: [
-            'Completed quarterly review',
-            'Attended training workshop',
-            'Updated system documentation'
-          ]
-        };
+        // Admin or other
+        return { stats: [], achievements: [], recentActivities: [] };
     }
   };
 
@@ -137,7 +177,7 @@ const Profile = () => {
                   {user.name.split(' ').map((n: string) => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
-              <Button 
+              <Button
                 size="icon"
                 variant="outline"
                 className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full"
@@ -146,7 +186,7 @@ const Profile = () => {
                 <Camera className="w-4 h-4" />
               </Button>
             </div>
-            
+
             <div className="flex-1 space-y-4">
               <div>
                 <div className="flex items-center gap-3 mb-2">
@@ -162,21 +202,21 @@ const Profile = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4" />
-                    +91 98765 43210
+                    {user.phone || 'N/A'}
                   </div>
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
-                    Mumbai, Maharashtra
+                    {user.address ? user.address.split(',')[0] : 'Location N/A'}
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    Joined January 2022
+                    Joined {new Date(user.createdAt).toLocaleDateString()}
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex gap-3">
-                <Button onClick={handleEditProfile}>
+                <Button onClick={isEditing ? handleSaveProfile : handleEditToggle}>
                   <Edit className="w-4 h-4 mr-2" />
                   {isEditing ? 'Save Changes' : 'Edit Profile'}
                 </Button>
@@ -257,28 +297,73 @@ const Profile = () => {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <p className="text-muted-foreground">Date of Birth</p>
-                    <p className="font-medium">15th March 1998</p>
+                    {isEditing ? (
+                      <Input name="dob" value={formData.dob} onChange={handleInputChange} placeholder="YYYY-MM-DD" />
+                    ) : (
+                      <p className="font-medium">{user.dob || 'Not Set'}</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-muted-foreground">Blood Group</p>
-                    <p className="font-medium">O+</p>
+                    {isEditing ? (
+                      <Input name="bloodGroup" value={formData.bloodGroup} onChange={handleInputChange} placeholder="e.g. O+" />
+                    ) : (
+                      <p className="font-medium">{user.bloodGroup || 'Not Set'}</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-muted-foreground">Father's Name</p>
-                    <p className="font-medium">Ramesh Kumar</p>
+                    {isEditing ? (
+                      <Input name="fatherName" value={formData.fatherName} onChange={handleInputChange} />
+                    ) : (
+                      <p className="font-medium">{user.fatherName || 'Not Set'}</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-muted-foreground">Mother's Name</p>
-                    <p className="font-medium">Sunita Devi</p>
+                    {isEditing ? (
+                      <Input name="motherName" value={formData.motherName} onChange={handleInputChange} />
+                    ) : (
+                      <p className="font-medium">{user.motherName || 'Not Set'}</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-muted-foreground">Emergency Contact</p>
-                    <p className="font-medium">+91 98765 43211</p>
+                    {isEditing ? (
+                      <Input name="emergencyContact" value={formData.emergencyContact} onChange={handleInputChange} />
+                    ) : (
+                      <p className="font-medium">{user.emergencyContact || 'Not Set'}</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-muted-foreground">Address</p>
-                    <p className="font-medium">Andheri West, Mumbai</p>
+                    {isEditing ? (
+                      <Textarea name="address" value={formData.address} onChange={handleInputChange} className="h-20" />
+                    ) : (
+                      <p className="font-medium">{user.address || 'Not Set'}</p>
+                    )}
                   </div>
+                  <div>
+                    <p className="text-muted-foreground">Bio</p>
+                    {isEditing ? (
+                      <Textarea name="bio" value={formData.bio} onChange={handleInputChange} className="h-20 col-span-2" />
+                    ) : (
+                      <p className="font-medium col-span-2">{user.bio || 'No bio added'}</p>
+                    )}
+                  </div>
+                  {/* Editable Contact Info (Phone) - also rendered in header but useful here too */}
+                  {isEditing && (
+                    <div>
+                      <p className="text-muted-foreground">Phone</p>
+                      <Input name="phone" value={formData.phone} onChange={handleInputChange} />
+                    </div>
+                  )}
+                  {isEditing && (
+                    <div>
+                      <p className="text-muted-foreground">Gender</p>
+                      <Input name="gender" value={formData.gender} onChange={handleInputChange} placeholder="Male/Female/Other" />
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -290,29 +375,49 @@ const Profile = () => {
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-muted-foreground">Student ID</p>
-                    <p className="font-medium">CSE21048</p>
+                    <p className="text-muted-foreground">ID / Employee Code</p>
+                    <p className="font-medium">{user.studentId || user._id.slice(-6).toUpperCase()}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Roll Number</p>
-                    <p className="font-medium">2021048</p>
+                    <p className="text-muted-foreground">Role</p>
+                    <p className="font-medium">{user.role}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Branch</p>
-                    <p className="font-medium">Computer Science</p>
+                    <p className="text-muted-foreground">Department</p>
+                    <p className="font-medium">{user.department || 'N/A'}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Section</p>
-                    <p className="font-medium">A</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Batch</p>
-                    <p className="font-medium">2021-2025</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Mentor</p>
-                    <p className="font-medium">Dr. Priya Sharma</p>
-                  </div>
+
+                  {user.role === 'Student' ? (
+                    <>
+                      <div>
+                        <p className="text-muted-foreground">Roll Number</p>
+                        <p className="font-medium">{user.rollNumber || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Batch</p>
+                        <p className="font-medium">{user.batch || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Section</p>
+                        <p className="font-medium">{user.section || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Mentor</p>
+                        <p className="font-medium">{user.mentor || 'N/A'}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-muted-foreground">Designation</p>
+                        <p className="font-medium">{user.designation || 'Faculty'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Qualification</p>
+                        <p className="font-medium">{user.qualification || 'N/A'}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

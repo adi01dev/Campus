@@ -12,6 +12,9 @@ export interface ISubmission {
 export interface IAssignment extends Document {
   title: string;
   subject: string;
+  department: string; // ✅ Target Dept
+  semester?: string; // ✅ Target Semester
+  faculty: Schema.Types.ObjectId; // ✅ Created by
   dueDate: string;
   totalMarks: number;
   instructions?: string;
@@ -31,6 +34,9 @@ const assignmentSchema = new Schema<IAssignment>(
   {
     title: { type: String, required: true },
     subject: { type: String, required: true },
+    department: { type: String, required: true },
+    semester: { type: String },
+    faculty: { type: Schema.Types.ObjectId, ref: "User", required: true },
     dueDate: { type: String, required: true },
     totalMarks: { type: Number, required: true },
     instructions: String,

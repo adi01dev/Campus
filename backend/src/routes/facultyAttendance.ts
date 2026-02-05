@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate } from "../middlewares/auth";
+import { authenticate, AuthRequest } from "../middlewares/auth";
 import { requireRole } from "../middlewares/requireRole";
 import AttendanceSession from "../models/AttendanceSession";
 import AttendanceRecord from "../models/AttendanceRecord";
@@ -9,11 +9,11 @@ import { generateQRToken } from "../utils/qrToken";
 const router = express.Router();
 
 // 🎯 Create attendance session (faculty)
-router.post("/create-session", authenticate, requireRole("Faculty"), async (req, res) => {
-    console.log("xyz");
+router.post("/create-session", authenticate, requireRole("Faculty"), async (req: AuthRequest, res) => {
+  console.log("xyz");
   try {
     // NOTE: your authenticate middleware must attach req.user
-    const facultyId = (req.user as any)?._id || (req.user as any)?.id;
+    const facultyId = req.user.id;
     if (!facultyId) return res.status(401).json({ message: "Unauthenticated" });
 
     const { course, sessionType, duration } = req.body;
@@ -22,14 +22,14 @@ router.post("/create-session", authenticate, requireRole("Faculty"), async (req,
     const durationMinutes = parseInt(duration) || 5;
     const expiresAt = new Date(Date.now() + durationMinutes * 60 * 1000);
 
-    // generate token valid for the chosen duration
-    const qrToken = generateQRToken({ facultyId, course, sessionType }, `${durationMinutes}m`);
+    const secret = require("crypto").randomBytes(32).toString("hex");
 
     const session = await AttendanceSession.create({
       faculty: facultyId,
       course,
       sessionType: sessionType || "Lecture",
-      qrToken,
+      qrToken: "DYNAMIC_CLIENT_SIDE", // Placeholder
+      secret,
       expiresAt,
       active: true,
     });
@@ -40,7 +40,7 @@ router.post("/create-session", authenticate, requireRole("Faculty"), async (req,
         id: session._id,
         course: session.course,
         sessionType: session.sessionType,
-        qrToken: session.qrToken,
+        secret: session.secret, // Send secret to client
         expiresAt: session.expiresAt,
       },
     });

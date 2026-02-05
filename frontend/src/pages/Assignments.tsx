@@ -5,51 +5,72 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Plus, Calendar, Users, CheckCircle, Clock } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+
+const API_BASE = "http://localhost:4000/api";
 
 const Assignments = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [token] = useState(localStorage.getItem("accessToken"));
 
-  const assignments = [
-    {
-      id: 1,
-      title: "Data Structures - Binary Trees Implementation",
-      course: "Data Structures & Algorithms",
-      dueDate: "2024-03-20",
-      totalMarks: 25,
-      submissions: 35,
-      totalStudents: 45,
-      status: "Active",
-    },
-    {
-      id: 2,
-      title: "Database Design Project - Library Management",
-      course: "Database Management Systems",
-      dueDate: "2024-03-25",
-      totalMarks: 40,
-      submissions: 28,
-      totalStudents: 45,
-      status: "Active",
-    },
-    {
-      id: 3,
-      title: "Operating Systems - Process Scheduling",
-      course: "Operating Systems",
-      dueDate: "2024-03-15",
-      totalMarks: 30,
-      submissions: 45,
-      totalStudents: 45,
-      status: "Grading",
-    },
-  ];
+  // Form State
+  const [formData, setFormData] = useState({
+    title: "",
+    subject: "",
+    dueDate: "",
+    totalMarks: "",
+    instructions: ""
+  });
+
+  const fetchAssignments = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/assignments`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) setAssignments(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchAssignments();
+  }, [token]);
+
+  const handleCreate = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/assignments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Success", description: "Assignment created" });
+        setShowCreateForm(false);
+        fetchAssignments();
+      } else {
+        toast({ title: "Error", description: data.message, variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Failed to create", variant: "destructive" });
+    }
+  };
 
   const stats = [
-    { label: "Active Assignments", value: "8", icon: FileText, color: "text-blue-600" },
-    { label: "Total Submissions", value: "256", icon: CheckCircle, color: "text-green-600" },
-    { label: "Pending Grading", value: "42", icon: Clock, color: "text-orange-600" },
-    { label: "Total Students", value: "45", icon: Users, color: "text-purple-600" },
+    { label: "Active Assignments", value: assignments.length.toString(), icon: FileText, color: "text-blue-600" },
+    { label: "Total Submissions", value: "0", icon: CheckCircle, color: "text-green-600" }, // Need backend stat
+    { label: "Pending Grading", value: "0", icon: Clock, color: "text-orange-600" },
+    { label: "Total Students", value: "N/A", icon: Users, color: "text-purple-600" },
   ];
 
   return (
@@ -105,49 +126,50 @@ const Assignments = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-medium">Assignment Title</label>
-                  <Input placeholder="Enter assignment title" />
+                  <Input
+                    placeholder="Enter assignment title"
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Course</label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select course" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dsa">Data Structures & Algorithms</SelectItem>
-                      <SelectItem value="dbms">Database Management Systems</SelectItem>
-                      <SelectItem value="os">Operating Systems</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <label className="text-sm font-medium">Subject</label> {/* Changed from Course to Subject */}
+                  <Input
+                    placeholder="e.g. Data Structures"
+                    value={formData.subject}
+                    onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Due Date</label>
-                  <Input type="date" />
+                  <Input
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Total Marks</label>
-                  <Input type="number" placeholder="Enter total marks" />
+                  <Input
+                    type="number"
+                    placeholder="Enter total marks"
+                    value={formData.totalMarks}
+                    onChange={e => setFormData({ ...formData, totalMarks: e.target.value })}
+                  />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Submission Type</label>
-                  <Select>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="file">File Upload</SelectItem>
-                      <SelectItem value="text">Text Submission</SelectItem>
-                      <SelectItem value="link">Link Submission</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-medium">Instructions</label>
-                  <Textarea placeholder="Enter assignment instructions and requirements" rows={6} />
+                  <Textarea
+                    placeholder="Enter assignment instructions and requirements"
+                    rows={6}
+                    value={formData.instructions}
+                    onChange={e => setFormData({ ...formData, instructions: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
-                <Button>Create Assignment</Button>
+                <Button onClick={handleCreate}>Create Assignment</Button>
                 <Button variant="outline" onClick={() => setShowCreateForm(false)}>
                   Cancel
                 </Button>
@@ -169,17 +191,15 @@ const Assignments = () => {
             <div className="space-y-4">
               {assignments.map((assignment) => (
                 <div
-                  key={assignment.id}
+                  key={assignment._id} // Use _id
                   className="p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="space-y-1">
                       <h4 className="font-semibold text-lg">{assignment.title}</h4>
-                      <p className="text-sm text-muted-foreground">{assignment.course}</p>
+                      <p className="text-sm text-muted-foreground">{assignment.subject}</p>
                     </div>
-                    <Badge variant={assignment.status === "Active" ? "default" : "secondary"}>
-                      {assignment.status}
-                    </Badge>
+                    <Badge variant="default">Active</Badge>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div>
@@ -196,27 +216,16 @@ const Assignments = () => {
                     <div>
                       <p className="text-sm text-muted-foreground">Submissions</p>
                       <p className="font-medium">
-                        {assignment.submissions}/{assignment.totalStudents}
+                        {assignment.submissions?.length || 0}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Progress</p>
-                      <div className="w-full bg-muted rounded-full h-2 mt-1">
-                        <div
-                          className="bg-primary rounded-full h-2"
-                          style={{
-                            width: `${(assignment.submissions / assignment.totalStudents) * 100}%`,
-                          }}
-                        />
-                      </div>
+                      {/* Removed Progress for simplicity unless we calculate total students */}
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline">
                       View Submissions
-                    </Button>
-                    <Button size="sm" variant="outline">
-                      Edit
                     </Button>
                     <Button size="sm" variant="outline">
                       Delete

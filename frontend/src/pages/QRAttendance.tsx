@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { QrCode, Scan, Users, Clock, Calendar, Download, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeCanvas } from 'qrcode.react';
 
@@ -69,6 +69,40 @@ const QRAttendance = () => {
 
   const subjects = ['Data Structures', 'Machine Learning', 'Database Systems', 'Algorithms'];
 
+  // Crypto helper for HMAC-SHA256
+  const signPayload = async (secret: string, data: string) => {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const key = await crypto.subtle.importKey(
+      "raw", keyData, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+    );
+    const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(data));
+    return Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const [activeSession, setActiveSession] = useState<{ id: string, secret: string } | null>(null);
+
+  // Effect to update QR every 10s if session is active
+  useEffect(() => {
+    if (!activeSession) return;
+
+    const updateQR = async () => {
+      const timestamp = Date.now();
+      const nonce = Math.random().toString(36).substring(7);
+      const signature = await signPayload(activeSession.secret, `${nonce}:${timestamp}`);
+      // Payload format: sessionId:nonce:timestamp:signature
+      const payload = `${activeSession.id}:${nonce}:${timestamp}:${signature}`;
+
+      setQrToken(payload);
+      setExpiresAt(new Date(timestamp + 15000).toISOString()); // 15s validity
+    };
+
+    updateQR(); // Initial
+    const interval = setInterval(updateQR, 10000); // Refresh every 10s
+
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
   const handleGenerateQR = async () => {
     if (!selectedSubject || !selectedSession) {
       toast({
@@ -98,12 +132,15 @@ const QRAttendance = () => {
 
       if (!res.ok) throw new Error(data.message);
 
-      setQrToken(data.session.qrToken);
-      setExpiresAt(data.session.expiresAt);
+      // Store session details (ID + Secret) to generate QRs locally
+      setActiveSession({
+        id: data.session.id,
+        secret: data.session.secret
+      });
 
       toast({
-        title: "QR Code Generated",
-        description: `QR for ${selectedSubject} (${selectedSession}) created successfully.`,
+        title: "Session Started",
+        description: `Dynamic QR generation active for ${selectedSubject}.`,
       });
     } catch (err: any) {
       toast({
@@ -118,14 +155,14 @@ const QRAttendance = () => {
 
 
   return (
-    <motion.div 
+    <motion.div
       className="space-y-6 p-6"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
       <BreadcrumbNav />
-      
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
@@ -141,7 +178,7 @@ const QRAttendance = () => {
           {loading ? "Generating..." : "Generate New QR"}
         </Button>
       </div>
-      
+
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <motion.div
@@ -261,43 +298,43 @@ const QRAttendance = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="duration">Duration (minutes)</Label>
-                <Input id="duration" type="number" placeholder="60" value={duration} onChange={(e) => setDuration(e.target.value)}/>
+                <Input id="duration" type="number" placeholder="60" value={duration} onChange={(e) => setDuration(e.target.value)} />
               </div>
 
 
 
-<div className="p-6 bg-background/50 rounded-lg text-center border-2 border-dashed">
-  {qrToken ? (
-    <>
-      <QRCodeCanvas 
-        value={qrToken} 
-        size={160} 
-        includeMargin={true} 
-        className="mx-auto mb-4"
-      />
-      <p className="text-sm font-medium text-green-600">QR Code Active</p>
-      {expiresAt && (
-        <p className="text-xs text-muted-foreground mt-1">
-          Expires at: {new Date(expiresAt).toLocaleTimeString()}
-        </p>
-      )}
-    </>
-  ) : (
-    <>
-      <QrCode className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">QR Code will appear here</p>
-    </>
-  )}
-</div>
+              <div className="p-6 bg-background/50 rounded-lg text-center border-2 border-dashed">
+                {qrToken ? (
+                  <>
+                    <QRCodeCanvas
+                      value={qrToken}
+                      size={160}
+                      includeMargin={true}
+                      className="mx-auto mb-4"
+                    />
+                    <p className="text-sm font-medium text-green-600">QR Code Active</p>
+                    {expiresAt && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Expires at: {new Date(expiresAt).toLocaleTimeString()}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <QrCode className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">QR Code will appear here</p>
+                  </>
+                )}
+              </div>
 
 
-        <Button className="glass-card"
-          onClick={handleGenerateQR}
-          disabled={loading}
-        >
-          <QrCode className="w-4 h-4 mr-2" />
-          {loading ? "Generating..." : "Generate New QR"}
-        </Button>
+              <Button className="glass-card"
+                onClick={handleGenerateQR}
+                disabled={loading}
+              >
+                <QrCode className="w-4 h-4 mr-2" />
+                {loading ? "Generating..." : "Generate New QR"}
+              </Button>
             </CardContent>
           </Card>
         </motion.div>
@@ -327,13 +364,13 @@ const QRAttendance = () => {
                         <div className="flex items-center gap-2">
                           <h3 className="font-semibold">{session.subject}</h3>
                           <Badge variant={
-                            session.status === 'ongoing' ? 'default' : 
-                            session.status === 'completed' ? 'secondary' : 'outline'
+                            session.status === 'ongoing' ? 'default' :
+                              session.status === 'completed' ? 'secondary' : 'outline'
                           }>
                             {session.status}
                           </Badge>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
                           <div>
                             <p><span className="font-medium">Time:</span> {session.time}</p>
@@ -342,12 +379,12 @@ const QRAttendance = () => {
                           </div>
                           <div>
                             <p><span className="font-medium">Students:</span> {session.totalStudents}</p>
-                            <p><span className="font-medium">Present:</span> 
+                            <p><span className="font-medium">Present:</span>
                               <span className={session.present >= session.totalStudents * 0.9 ? 'text-green-500' : 'text-orange-500'}>
                                 {" "}{session.present}/{session.totalStudents}
                               </span>
                             </p>
-                            <p><span className="font-medium">Attendance:</span> 
+                            <p><span className="font-medium">Attendance:</span>
                               <span className={session.present >= session.totalStudents * 0.9 ? 'text-green-500' : 'text-orange-500'}>
                                 {" "}{Math.round((session.present / session.totalStudents) * 100)}%
                               </span>
@@ -355,7 +392,7 @@ const QRAttendance = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-2">
                         {session.status === 'ongoing' && (
                           <Button variant="ghost" size="sm">

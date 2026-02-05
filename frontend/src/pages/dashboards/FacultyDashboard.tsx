@@ -2,9 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Users, 
-  BookOpen, 
+import {
+  Users,
+  BookOpen,
   Clock,
   FileText,
   QrCode,
@@ -20,33 +20,60 @@ import {
 } from 'lucide-react';
 
 
+import { useState, useEffect } from 'react';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+
 const FacultyDashboard = () => {
+  const [user, setUser] = useState<any>(null);
+  const [stats, setStats] = useState<any>({});
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+      const headers = { Authorization: `Bearer ${token}` };
+
+      try {
+        // 1. Fetch Me
+        const userRes = await fetch(`${API_BASE}/auth/me`, { headers });
+        if (userRes.ok) setUser(await userRes.json());
+
+        // 2. Fetch Stats
+        const statsRes = await fetch(`${API_BASE}/dashboard/stats`, { headers });
+        if (statsRes.ok) setStats(await statsRes.json());
+
+        // 3. Fetch Schedule
+        const scheduleRes = await fetch(`${API_BASE}/dashboard/schedule`, { headers });
+        if (scheduleRes.ok) setSchedule(await scheduleRes.json());
+
+      } catch (error) {
+        console.error("Dashboard fetch error", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
   const quickStats = [
-    { icon: BookOpen, label: 'Courses Teaching', value: '4', color: 'text-primary' },
-    { icon: Users, label: 'Total Students', value: '156', color: 'text-success' },
-    { icon: MessageSquare, label: 'Pending Queries', value: '5', color: 'text-warning' },
-    { icon: FileText, label: 'Assignments to Review', value: '12', color: 'text-secondary' },
+    { icon: BookOpen, label: 'Courses Teaching', value: stats.coursesTeaching?.toString() || '0', color: 'text-primary' },
+    { icon: Users, label: 'Total Students', value: stats.totalStudents?.toString() || '0', color: 'text-success' },
+    { icon: MessageSquare, label: 'Pending Queries', value: stats.pendingQueries?.toString() || '0', color: 'text-warning' },
+    { icon: FileText, label: 'Assignments to Review', value: stats.assignmentsToReview?.toString() || '0', color: 'text-secondary' },
   ];
 
-  const todaysClasses = [
-    { time: '9:00 AM', course: 'Database Systems', students: 45, room: 'CS-205', type: 'Practical' },
-    { time: '11:00 AM', course: 'Data Structures', students: 38, room: 'CS-101', type: 'Lecture' },
-    { time: '2:00 PM', course: 'Algorithm Design', students: 42, room: 'CS-301', type: 'Tutorial' },
-    { time: '4:00 PM', course: 'Machine Learning', students: 31, room: 'CS-401', type: 'Lab' },
-  ];
-
+  // Static for now, as no Query API endpoint fully integrated in dashboard yet specific for this view
   const studentQueries = [
     { student: 'Ansh Dubey', query: 'Clarification on Database Normalization', course: 'DBMS', time: '2 hours ago', urgent: false },
     { student: 'Ramesh Kumar', query: 'Assignment submission deadline extension', course: 'DSA', time: '4 hours ago', urgent: true },
-    { student: 'Pankaj Sharma', query: 'Concept doubt in Tree Traversal', course: 'DSA', time: '6 hours ago', urgent: false },
-    { student: 'Aditya Dewangan', query: 'Project topic discussion', course: 'ML', time: '1 day ago', urgent: false },
   ];
 
   const classPerformance = [
     { course: 'Database Systems', attendance: 89, avgScore: 85, assignments: 8 },
     { course: 'Data Structures', attendance: 92, avgScore: 78, assignments: 12 },
-    { course: 'Algorithm Design', attendance: 87, avgScore: 82, assignments: 6 },
-    { course: 'Machine Learning', attendance: 94, avgScore: 88, assignments: 4 },
   ];
 
   return (
@@ -55,18 +82,18 @@ const FacultyDashboard = () => {
       <div className="bg-gradient-hero rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Welcome Back, Dr. Ramesh Sharma</h1>
+            <h1 className="text-3xl font-bold mb-2">Welcome Back, {user?.name || 'Faculty'}</h1>
             <p className="text-white/80 text-lg">
-              You have 4 classes scheduled today and 5 student queries waiting for your response.
+              You have {schedule.length} classes scheduled today and {stats.pendingQueries || 0} student queries waiting.
             </p>
             <div className="flex items-center gap-4 mt-4">
               <div className="flex items-center gap-2">
                 <GraduationCap className="w-5 h-5" />
-                <span>Computer Science Department</span>
+                <span>{user?.department || 'Department'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Target className="w-5 h-5" />
-                <span>Senior Faculty</span>
+                <span>Faculty</span>
               </div>
             </div>
           </div>
@@ -112,25 +139,29 @@ const FacultyDashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {todaysClasses.map((item, index) => (
-                  <div key={index} className="p-3 bg-muted/20 rounded-lg border border-border/50">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="font-medium text-foreground">{item.course}</p>
-                        <p className="text-sm text-muted-foreground">{item.time} • {item.room}</p>
+              {schedule.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No classes scheduled today.</p>
+              ) : (
+                <div className="space-y-3">
+                  {schedule.map((item, index) => (
+                    <div key={index} className="p-3 bg-muted/20 rounded-lg border border-border/50">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-medium text-foreground">{item.course}</p>
+                          <p className="text-sm text-muted-foreground">{item.startTime} - {item.endTime} • {item.room}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">{item.type}</Badge>
                       </div>
-                      <Badge variant="outline" className="text-xs">{item.type}</Badge>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-muted-foreground">{item.studentsCount || 0} students</span>
+                        <Button variant="ghost" size="sm" className="h-6 text-xs">
+                          Take Attendance
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-muted-foreground">{item.students} students</span>
-                      <Button variant="ghost" size="sm" className="h-6 text-xs">
-                        Take Attendance
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

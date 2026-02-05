@@ -7,74 +7,57 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, UserPlus, Mail, Phone, MapPin, GraduationCap, BookOpen } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
 const DepartmentStaff = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [staffMembers, setStaffMembers] = useState<any[]>([]);
+  const [token] = useState(localStorage.getItem('accessToken'));
 
-  const staffMembers = [
-    {
-      id: 1,
-      name: 'Dr. Priya Sharma',
-      designation: 'Professor & HOD',
-      department: 'Computer Science',
-      email: 'priya.sharma@college.edu.in',
-      phone: '+91 98765 43210',
-      subjects: ['Data Structures', 'Algorithms', 'Database Systems'],
-      experience: '15 years',
-      qualification: 'Ph.D. Computer Science',
-      status: 'active'
-    },
-    {
-      id: 2,
-      name: 'Prof. Rahul Patel',
-      designation: 'Associate Professor',
-      department: 'Computer Science',
-      email: 'rahul.patel@college.edu.in',
-      phone: '+91 87654 32109',
-      subjects: ['Machine Learning', 'AI', 'Python Programming'],
-      experience: '12 years',
-      qualification: 'M.Tech Computer Science',
-      status: 'active'
-    },
-    {
-      id: 3,
-      name: 'Dr. Anita Gupta',
-      designation: 'Assistant Professor',
-      department: 'Electronics',
-      email: 'anita.gupta@college.edu.in',
-      phone: '+91 76543 21098',
-      subjects: ['Digital Electronics', 'Microprocessors', 'VLSI Design'],
-      experience: '8 years',
-      qualification: 'Ph.D. Electronics',
-      status: 'active'
-    },
-    {
-      id: 4,
-      name: 'Prof. Vikram Singh',
-      designation: 'Professor',
-      department: 'Mechanical',
-      email: 'vikram.singh@college.edu.in',
-      phone: '+91 65432 10987',
-      subjects: ['Thermodynamics', 'Fluid Mechanics', 'Heat Transfer'],
-      experience: '18 years',
-      qualification: 'M.Tech Mechanical',
-      status: 'on_leave'
-    }
-  ];
+  useEffect(() => {
+    const fetchStaff = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/assignments/sync-map`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          // Transform data if needed
+          const mapped = data.map((u: any) => ({
+            id: u._id,
+            name: u.name,
+            designation: u.role, // or add designation field
+            department: u.department,
+            email: u.email,
+            phone: "N/A", // Not in User model
+            subjects: u.subjects || [],
+            experience: "N/A",
+            qualification: "N/A",
+            status: "active"
+          }));
+          setStaffMembers(mapped);
+        }
+      } catch (err) {
+        console.error("Failed to fetch staff", err);
+      }
+    };
+    if (token) fetchStaff();
+  }, [token]);
 
   const departments = ['Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Electrical'];
 
   return (
-    <motion.div 
+    <motion.div
       className="space-y-6 p-6"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
       <BreadcrumbNav />
-      
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
@@ -221,7 +204,7 @@ const DepartmentStaff = () => {
                         {staff.status === 'active' ? 'Active' : 'On Leave'}
                       </Badge>
                     </div>
-                    
+
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-4 h-4 text-muted-foreground" />

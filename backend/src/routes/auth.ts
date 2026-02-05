@@ -104,6 +104,54 @@ router.post('/logout', async (req, res) => {
 });
 
 /**
+ * GET /api/auth/me
+ * Returns current user details
+ */
+router.get('/me', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-passwordHash -refreshToken');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * PUT /api/auth/profile
+ * Update current user profile details
+ */
+router.put('/profile', authenticate, async (req: AuthRequest, res) => {
+  try {
+    // Whitelist allowed fields for update
+    const allowedUpdates = [
+      'phone', 'address', 'bio', 'dob', 'bloodGroup', 'gender',
+      'fatherName', 'motherName', 'emergencyContact', 'profileImage'
+    ];
+
+    const updates: any = {};
+    Object.keys(req.body).forEach(key => {
+      if (allowedUpdates.includes(key)) {
+        updates[key] = req.body[key];
+      }
+    });
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).select('-passwordHash -refreshToken');
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
  * Admin route to create a user
  * POST /api/auth/admin/create-user
  * body: { name, email, role, department, isMoUCoordinator, password? }

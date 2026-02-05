@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middlewares/auth';
+import { authenticate, AuthRequest } from '../middlewares/auth';
 import { requireRole } from '../middlewares/requireRole';
 import Class from '../models/Class';
 import Query from '../models/Query';
@@ -10,9 +10,9 @@ import AttendanceSession from '../models/AttendanceSession';
 const router = express.Router();
 
 // 1. Get quick stats
-router.get('/dashboard/quick-stats', authenticate, requireRole('Faculty'), async (req, res) => {
+router.get('/dashboard/quick-stats', authenticate, requireRole('Faculty'), async (req: AuthRequest, res) => {
   try {
-    const facultyId = (req.user as any).id;
+    const facultyId = req.user.id;
     // fetch counts
     const coursesCount = await Class.countDocuments({ faculty: facultyId });
     const studentsTotal = await Class.aggregate([
@@ -34,13 +34,13 @@ router.get('/dashboard/quick-stats', authenticate, requireRole('Faculty'), async
 });
 
 // 2. Get today’s classes
-router.get('/dashboard/todays-classes', authenticate, requireRole('Faculty'), async (req, res) => {
+router.get('/dashboard/todays-classes', authenticate, requireRole('Faculty'), async (req: AuthRequest, res) => {
   try {
-    const facultyId = (req.user as any).id;
+    const facultyId = req.user.id;
     const startOfDay = new Date();
-    startOfDay.setHours(0,0,0,0);
+    startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date();
-    endOfDay.setHours(23,59,59,999);
+    endOfDay.setHours(23, 59, 59, 999);
     const classes = await Class.find({
       faculty: facultyId,
       scheduleDateTime: { $gte: startOfDay, $lte: endOfDay }
@@ -52,9 +52,9 @@ router.get('/dashboard/todays-classes', authenticate, requireRole('Faculty'), as
 });
 
 // 3. Get student queries
-router.get('/dashboard/queries', authenticate, requireRole('Faculty'), async (req, res) => {
+router.get('/dashboard/queries', authenticate, requireRole('Faculty'), async (req: AuthRequest, res) => {
   try {
-    const facultyId = (req.user as any).id;
+    const facultyId = req.user.id;
     const queries = await Query.find({ faculty: facultyId }).select('student question course time urgent status');
     res.json(queries);
   } catch (err: any) {
@@ -63,9 +63,9 @@ router.get('/dashboard/queries', authenticate, requireRole('Faculty'), async (re
 });
 
 // 4. Get class performance
-router.get('/dashboard/performance', authenticate, requireRole('Faculty'), async (req, res) => {
+router.get('/dashboard/performance', authenticate, requireRole('Faculty'), async (req: AuthRequest, res) => {
   try {
-    const facultyId = (req.user as any).id;
+    const facultyId = req.user.id;
     const performance = await Performance.find({ faculty: facultyId }).select('course attendancePercentage avgScore assignmentsCount');
     res.json(performance);
   } catch (err: any) {
@@ -74,10 +74,10 @@ router.get('/dashboard/performance', authenticate, requireRole('Faculty'), async
 });
 
 // 5. Create attendance session (generate QR etc)
-router.post('/attendance/session', authenticate, requireRole('Faculty'), async (req, res) => {
+router.post('/attendance/session', authenticate, requireRole('Faculty'), async (req: AuthRequest, res) => {
   try {
     const { course } = req.body;
-    const facultyId = (req.user as any).id;
+    const facultyId = req.user.id;
     const sessionId = Date.now().toString(); // or better generate uuid
     const session = await AttendanceSession.create({
       faculty: facultyId,

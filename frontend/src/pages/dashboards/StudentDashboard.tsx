@@ -4,15 +4,15 @@ import { Button } from '@/components/ui/button';
 import { QrCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import QrReader from "react-qr-reader-es6"; // npm install react-qr-reader
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Progress } from '@/components/ui/progress';
 import AIAssistant from '../AIAssistant';
 import MoURequests from '../MoURequests';
 import FeePayment from '../FeePayment';
 import { Link } from 'react-router-dom';
-import { 
-  BookOpen, 
-  Calendar, 
+import {
+  BookOpen,
+  Calendar,
   Clock,
   FileText,
   CreditCard,
@@ -30,19 +30,57 @@ import {
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
 const StudentDashboard = () => {
+
+  const [scanOpen, setScanOpen] = useState(false);
+  const { toast } = useToast();
+  const token = localStorage.getItem("accessToken");
+
+  // Dynamic Data State
+  const [user, setUser] = useState<any>(null);
+  const [stats, setStats] = useState<any>({});
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!token) return;
+      try {
+        const headers = { Authorization: `Bearer ${token}` };
+
+        // Parallel fetch
+        const [userRes, statsRes, scheduleRes, assignRes] = await Promise.all([
+          fetch(`${API_BASE}/auth/me`, { headers }),
+          fetch(`${API_BASE}/dashboard/stats`, { headers }),
+          fetch(`${API_BASE}/dashboard/schedule`, { headers }),
+          fetch(`${API_BASE}/assignments`, { headers })
+        ]);
+
+        if (userRes.ok) setUser(await userRes.json());
+        if (statsRes.ok) setStats(await statsRes.json());
+        if (scheduleRes.ok) setSchedule(await scheduleRes.json());
+        if (assignRes.ok) setAssignments(await assignRes.json());
+
+      } catch (err) {
+        console.error("Failed to load dashboard data", err);
+      }
+    };
+    fetchDashboardData();
+  }, [token]);
+
+  // Derived Data for UI
   const quickStats = [
-    { icon: BookOpen, label: 'Enrolled Courses', value: '8', color: 'text-primary' },
-    { icon: Calendar, label: 'Classes Today', value: '5', color: 'text-success' },
-    { icon: FileText, label: 'Assignments Due', value: '3', color: 'text-warning' },
-    { icon: Trophy, label: 'Overall Grade', value: 'A-', color: 'text-secondary' },
+    { label: 'Overall Attendance', value: '85%', change: '+2.5%', icon: Calendar, color: 'text-blue-500' },
+    { label: 'Pending Assignments', value: stats.assignmentsPending?.toString() || '0', change: 'Due Soon', icon: FileText, color: 'text-orange-500' },
+    { label: 'Classes Today', value: stats.classesToday?.toString() || schedule.length.toString(), change: 'On Time', icon: Clock, color: 'text-green-500' },
+    { label: 'Enrolled Courses', value: stats.enrolledCourses?.toString() || '0', change: 'Active', icon: BookOpen, color: 'text-purple-500' },
   ];
 
-  const todaysSchedule = [
-    { time: '9:00 AM', subject: 'Data Structures', room: 'CS-101', type: 'Lecture' },
-    { time: '11:00 AM', subject: 'Database Systems', room: 'CS-205', type: 'Practical' },
-    { time: '2:00 PM', subject: 'Software Engineering', room: 'CS-301', type: 'Lecture' },
-    { time: '4:00 PM', subject: 'Machine Learning', room: 'CS-401', type: 'Tutorial' },
-  ];
+  const todaysSchedule = schedule.map((item: any) => ({
+    time: `${item.startTime}`,
+    subject: item.course,
+    room: item.room,
+    type: item.type
+  }));
 
   const recentAssignments = [
     { title: 'Database Design Project', subject: 'DBMS', dueDate: 'Tomorrow', status: 'pending' },
@@ -57,35 +95,112 @@ const StudentDashboard = () => {
     { subject: 'Machine Learning', attended: 18, total: 20, percentage: 90 },
   ];
 
-  const [scanOpen, setScanOpen] = useState(false);
-  const { toast } = useToast();
-  const token = localStorage.getItem("accessToken");
+  const [offlineScans, setOfflineScans] = useState<any[]>(() => {
+    const saved = localStorage.getItem("offline_attendance");
+    return saved ? JSON.parse(saved) : [];
+  });
 
-  const handleScan = async (qrToken: string | null) => {
-    if (!qrToken) return;
+  // Auto-sync when coming online
+  useEffect(() => {
+    const handleOnline = () => {
+      if (offlineScans.length > 0) {
+        toast({ title: "Back Online", description: "Syncing offline attendance..." });
+        syncOfflineAttendance();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+
+    // Also try initial sync if we have data and are connected
+    if (navigator.onLine && offlineScans.length > 0) {
+      syncOfflineAttendance();
+    }
+
+    return () => window.removeEventListener('online', handleOnline);
+  }, [offlineScans]);
+
+  const handleScan = async (qrPayload: string | null) => {
+    if (!qrPayload) return;
+
+    // Check if result is already processed to avoid double scans
+    setScanOpen(false);
 
     try {
-      const res = await fetch(`${API_BASE}/student/attendance/mark`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ qrToken }),
-      });
+      // 1. Parse Payload to validate format immediately
+      const parts = qrPayload.split(":");
+      if (parts.length !== 4) {
+        throw new Error("Invalid QR Code format");
+      }
+      const [sessionId, nonce, timestampStr, signature] = parts;
 
-      const data = await res.json();
+      const scanTime = Date.now();
+      const genTime = parseInt(timestampStr);
+      const scanDelay = scanTime - genTime;
 
-      if (!res.ok) throw new Error(data.message);
-      toast({ title: "Attendance Marked", description: data.message });
-      setScanOpen(false);
+      const payloadData = {
+        sessionId,
+        qrPayload,
+        scanDelay,
+        timestamp: scanTime
+      };
+
+      // 2. Check Connection
+      if (!navigator.onLine) {
+        const updated = [...offlineScans, payloadData];
+        setOfflineScans(updated);
+        localStorage.setItem("offline_attendance", JSON.stringify(updated));
+        toast({ title: "Saved Offline", description: "Attendance will sync when online." });
+        return;
+      }
+
+      // 3. Online: Send to Backend
+      await submitAttendance(payloadData);
+
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
+  const submitAttendance = async (data: any) => {
+    const res = await fetch(`${API_BASE}/student/attendance/mark`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const resData = await res.json();
+    if (!res.ok) throw new Error(resData.message);
+    toast({ title: "Attendance Marked", description: resData.message });
+  };
+
+  const syncOfflineAttendance = async () => {
+    let syncedCount = 0;
+    const remaining: any[] = [];
+
+    for (const scan of offlineScans) {
+      try {
+        await submitAttendance(scan);
+        syncedCount++;
+      } catch (err) {
+        console.error("Sync failed for", scan, err);
+        remaining.push(scan); // Keep failed ones
+      }
+    }
+
+    setOfflineScans(remaining);
+    localStorage.setItem("offline_attendance", JSON.stringify(remaining));
+
+    if (syncedCount > 0) {
+      toast({ title: "Sync Complete", description: `Uploaded ${syncedCount} records.` });
+    }
+  };
+
   const handleError = (err: any) => {
-    toast({ title: "Scan Error", description: err.message, variant: "destructive" });
+    // Suppress minor scanning errors
+    console.log(err);
   };
 
 
@@ -95,9 +210,9 @@ const StudentDashboard = () => {
       <div className="bg-gradient-hero rounded-2xl p-8 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Welcome Back . . . </h1>
+            <h1 className="text-3xl font-bold mb-2">Welcome Back, {user?.name || 'Student'}</h1>
             <p className="text-white/80 text-lg">
-              Ready to continue your learning journey? You have 3 assignments due this week.
+              Ready to continue your learning journey? You have {assignments.length || stats.assignmentsPending || 0} assignments due.
             </p>
             <div className="flex items-center gap-4 mt-4">
               <div className="flex items-center gap-2">
@@ -229,8 +344,8 @@ const StudentDashboard = () => {
                         <p className="text-xs text-muted-foreground">{item.attended}/{item.total} classes</p>
                       </div>
                     </div>
-                    <Progress 
-                      value={item.percentage} 
+                    <Progress
+                      value={item.percentage}
                       className={`h-2 ${item.percentage < 75 ? '[&>div]:bg-destructive' : item.percentage < 85 ? '[&>div]:bg-warning' : '[&>div]:bg-success'}`}
                     />
                   </div>
@@ -252,9 +367,22 @@ const StudentDashboard = () => {
           <p className="text-sm text-muted-foreground mb-4">
             Use camera to scan faculty’s QR code
           </p>
-          <Button variant="outline" className="w-full">
+          <Button variant="outline" className="w-full mb-2">
             Start Scanner
           </Button>
+
+          {offlineScans.length > 0 && (
+            <Button
+              variant="default"
+              className="w-full bg-orange-500 hover:bg-orange-600 animate-pulse"
+              onClick={(e) => {
+                e.stopPropagation();
+                syncOfflineAttendance();
+              }}
+            >
+              Sync Offline ({offlineScans.length})
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -288,11 +416,11 @@ const StudentDashboard = () => {
             </div>
             <h3 className="font-semibold text-foreground mb-2">Pay Fees</h3>
             <p className="text-sm text-muted-foreground mb-4">Semester fee payment due in 15 days</p>
-            
+
             <Link to="/fee-payment">
-            <Button variant="outline" className="w-full">
-              Pay Now
-            </Button>
+              <Button variant="outline" className="w-full">
+                Pay Now
+              </Button>
             </Link>
           </CardContent>
         </Card>
@@ -305,9 +433,9 @@ const StudentDashboard = () => {
             <h3 className="font-semibold text-foreground mb-2">AI Study Helper</h3>
             <p className="text-sm text-muted-foreground mb-4">Get personalized course recommendations</p>
             <Link to="/ai-assistant">
-            <Button variant="outline" className="w-full">
-              Explore
-            </Button>
+              <Button variant="outline" className="w-full">
+                Explore
+              </Button>
             </Link>
           </CardContent>
         </Card>
@@ -320,10 +448,10 @@ const StudentDashboard = () => {
             <h3 className="font-semibold text-foreground mb-2">MoU Requests</h3>
             <p className="text-sm text-muted-foreground mb-4">Submit memorandum requests to faculty</p>
             <Link to="/mou-requests"
-            > 
-            <Button variant="outline" className="w-full">
-              Submit Request
-            </Button>
+            >
+              <Button variant="outline" className="w-full">
+                Submit Request
+              </Button>
             </Link>
           </CardContent>
         </Card>

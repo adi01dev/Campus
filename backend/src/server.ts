@@ -10,10 +10,11 @@ import facultyRoutes from './routes/faculty';
 import queryRoutes from './routes/queryRoutes';
 import facultyAttendanceRoutes from "./routes/facultyAttendance";
 import studentAttendanceRoutes from "./routes/studentAttendance";
-import MoURoutes from './routes/mouRoutes'; 
+import MoURoutes from './routes/mouRoutes';
 import path from "path";
 import materialRoutes from "./routes/material.routes";
 import assignmentRoutes from "./routes/assignment.routes";
+import dashboardRoutes from "./routes/dashboard";
 
 dotenv.config();
 const app = express();
@@ -58,6 +59,7 @@ app.get("/", (req, res) => {
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.use("/api/assignments", assignmentRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 app.use("/api/materials", materialRoutes);
 

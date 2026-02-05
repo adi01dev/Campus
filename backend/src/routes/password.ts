@@ -4,6 +4,7 @@ import { generateRandomPassword } from "../utils/generatePassword";
 import { sendEmail } from "../utils/mailer";
 import bcrypt from "bcryptjs";
 
+// Router for password related operations
 const router = express.Router();
 
 router.post("/send-password", async (req: Request, res: Response) => {

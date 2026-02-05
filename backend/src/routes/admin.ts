@@ -75,11 +75,11 @@ router.post('/users', authenticate, requireRole('Admin'), async (req: Request, r
  */
 router.put('/users/:id', authenticate, requireRole('Admin'), async (req: Request, res: Response) => {
   try {
-    const { name, email, department, semester, isMoUCoordinator, role } = req.body;
+    const { name, email, department, semester, isMoUCoordinator, role, subjects } = req.body;
 
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
-      { name, email, department, semester, isMoUCoordinator, role },
+      { name, email, department, semester, isMoUCoordinator, role, subjects },
       { new: true }
     ).select('-passwordHash -refreshToken');
 
