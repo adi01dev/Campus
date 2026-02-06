@@ -266,7 +266,6 @@ const Profile = () => {
           <div className="flex flex-col md:flex-row items-start gap-6">
             <div className="relative">
               <Avatar className="w-24 h-24">
-<<<<<<< HEAD
                 {user.profileImage ? (
                   <img
                     src={user.profileImage.startsWith('http') ? user.profileImage : `${BACKEND_URL}${user.profileImage}`}
@@ -278,11 +277,6 @@ const Profile = () => {
                     {user.name.split(' ').map((n: string) => n[0]).join('')}
                   </AvatarFallback>
                 )}
-=======
-                <AvatarFallback className="bg-gradient-primary text-primary-foreground text-2xl">
-                  {user?.name ? user.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
-                </AvatarFallback>
->>>>>>> c913fbc368a8b47db07affaaad0697ae62793203
               </Avatar>
               <Button
                 size="icon"
@@ -305,7 +299,6 @@ const Profile = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
-<<<<<<< HEAD
                     {isEditing ? (
                       user.isEmailChanged ? (
                         <div className="flex items-center gap-2 text-muted-foreground" title="Email can only be changed once">
@@ -333,17 +326,6 @@ const Profile = () => {
                     ) : (
                       user.address ? user.address.split(',')[0] : 'Location N/A'
                     )}
-=======
-                    {user?.email || 'No Email'}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
-                    {user?.phone || 'N/A'}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    {user?.address ? user.address.split(',')[0] : 'Location N/A'}
->>>>>>> c913fbc368a8b47db07affaaad0697ae62793203
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
