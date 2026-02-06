@@ -168,7 +168,8 @@ const Profile = () => {
   };
 
   const getRoleSpecificContent = () => {
-    switch (user.role.toLowerCase()) {
+    const role = user?.role?.toLowerCase() || '';
+    switch (role) {
       case 'student':
         return {
           stats: [
@@ -178,7 +179,7 @@ const Profile = () => {
             { label: 'Subjects', value: '6', icon: BookOpen, color: 'text-primary' } // Calculated or static
           ],
           achievements: user.achievements || [
-            { title: 'Joined College', description: 'Started academic journey', date: new Date(user.createdAt).toLocaleDateString() }
+            { title: 'Joined College', description: 'Started academic journey', date: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A' }
           ],
           recentActivities: [ // Placeholder for now or fetch activity logs
             'Logged in successfully',
@@ -265,6 +266,7 @@ const Profile = () => {
           <div className="flex flex-col md:flex-row items-start gap-6">
             <div className="relative">
               <Avatar className="w-24 h-24">
+<<<<<<< HEAD
                 {user.profileImage ? (
                   <img
                     src={user.profileImage.startsWith('http') ? user.profileImage : `${BACKEND_URL}${user.profileImage}`}
@@ -276,6 +278,11 @@ const Profile = () => {
                     {user.name.split(' ').map((n: string) => n[0]).join('')}
                   </AvatarFallback>
                 )}
+=======
+                <AvatarFallback className="bg-gradient-primary text-primary-foreground text-2xl">
+                  {user?.name ? user.name.split(' ').map((n: string) => n[0]).join('') : 'U'}
+                </AvatarFallback>
+>>>>>>> c913fbc368a8b47db07affaaad0697ae62793203
               </Avatar>
               <Button
                 size="icon"
@@ -290,14 +297,15 @@ const Profile = () => {
             <div className="flex-1 space-y-4">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-3xl font-bold">{user.name}</h1>
+                  <h1 className="text-3xl font-bold">{user?.name || 'User'}</h1>
                   <Badge variant="secondary" className="capitalize">
-                    {user.role}
+                    {user?.role || 'Guest'}
                   </Badge>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
+<<<<<<< HEAD
                     {isEditing ? (
                       user.isEmailChanged ? (
                         <div className="flex items-center gap-2 text-muted-foreground" title="Email can only be changed once">
@@ -325,10 +333,21 @@ const Profile = () => {
                     ) : (
                       user.address ? user.address.split(',')[0] : 'Location N/A'
                     )}
+=======
+                    {user?.email || 'No Email'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    {user?.phone || 'N/A'}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    {user?.address ? user.address.split(',')[0] : 'Location N/A'}
+>>>>>>> c913fbc368a8b47db07affaaad0697ae62793203
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    Joined {new Date(user.createdAt).toLocaleDateString()}
+                    Joined {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                   </div>
                 </div>
               </div>
