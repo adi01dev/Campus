@@ -40,6 +40,18 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       localStorage.removeItem('user');
       navigate('/login', { replace: true });
     }
+    const handleUserUpdate = () => {
+      const updatedUserStr = localStorage.getItem('user');
+      if (updatedUserStr) {
+        setUser(JSON.parse(updatedUserStr));
+      }
+    };
+
+    window.addEventListener('user-updated', handleUserUpdate);
+
+    return () => {
+      window.removeEventListener('user-updated', handleUserUpdate);
+    };
   }, [navigate]);
 
   // 🌀 Optional loading screen before redirect or layout load

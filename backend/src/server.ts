@@ -1,4 +1,5 @@
 import express from 'express';
+import studentRoutes from './routes/student';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -19,7 +20,9 @@ import dashboardRoutes from "./routes/dashboard";
 dotenv.config();
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(express.json());
 
 // ✅ CORS FIX
@@ -37,8 +40,7 @@ app.use('/api/faculty', facultyRoutes);
 
 app.use("/api/faculty/attendance", facultyAttendanceRoutes);
 app.use("/api/student/attendance", studentAttendanceRoutes);
-
-
+app.use('/api/student', studentRoutes);
 
 app.use('/api/admin', adminRoutes);
 

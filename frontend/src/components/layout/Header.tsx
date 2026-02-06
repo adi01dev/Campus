@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Search, Bell, MessageSquare, Settings, User, Sun, Moon, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -18,7 +19,11 @@ interface User {
   email: string;
   role: string;
   name: string;
+  profileImage?: string;
 }
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+const BACKEND_URL = API_BASE.replace('/api', '');
 
 interface HeaderProps {
   user: User;
@@ -34,7 +39,7 @@ export const Header = ({ user }: HeaderProps) => {
     if (path.includes('/dashboard/')) {
       return `${user.role} Dashboard`;
     }
-    
+
     const titleMap: Record<string, string> = {
       '/profile': 'My Profile',
       '/settings': 'Settings',
@@ -91,7 +96,7 @@ export const Header = ({ user }: HeaderProps) => {
             <h1 className="text-2xl font-bold text-foreground">{getPageTitle()}</h1>
             <p className="text-sm text-muted-foreground">{getCurrentTime()}</p>
           </div>
-          
+
           <div className="hidden md:block flex-1 max-w-md">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -125,11 +130,17 @@ export const Header = ({ user }: HeaderProps) => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-3 px-3 py-2 hover:bg-primary/10">
-                <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
-                  <span className="text-primary-foreground text-sm font-semibold">
+                <Avatar className="w-8 h-8">
+                  {user.profileImage && (
+                    <AvatarImage
+                      src={user.profileImage.startsWith('http') ? user.profileImage : `${BACKEND_URL}${user.profileImage}`}
+                      className="object-cover"
+                    />
+                  )}
+                  <AvatarFallback className="bg-blue-600 text-white text-sm font-bold">
                     {user.name.split(' ').map(n => n[0]).join('')}
-                  </span>
-                </div>
+                  </AvatarFallback>
+                </Avatar>
                 <div className="hidden md:block text-left">
                   <p className="text-sm font-medium">{user.name}</p>
                   <p className="text-xs text-muted-foreground">{user.role}</p>

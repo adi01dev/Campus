@@ -7,13 +7,23 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { FileText, Upload, Clock, CheckCircle, AlertCircle, Search, Calendar, X } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+const BACKEND_URL = API_BASE.replace('/api', '');
+
 const StudentAssignments = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+
+  // Get active tab from URL query param
+  const queryParams = new URLSearchParams(location.search);
+  const defaultTab = queryParams.get('tab') || 'all';
+
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
   const [submissionDialog, setSubmissionDialog] = useState(false);
@@ -27,7 +37,7 @@ const StudentAssignments = () => {
 
   const fetchAssignments = async () => {
     try {
-      const res = await fetch("http://localhost:4000/api/assignments", {
+      const res = await fetch(`${API_BASE}/assignments`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -37,14 +47,16 @@ const StudentAssignments = () => {
           title: a.title,
           subject: a.subject,
           dueDate: a.dueDate,
-          status: "pending", // Default, we need to check if user has submitted
+          // Backend now provides these fields (sanitized for student)
+          status: a.status || "pending",
           marks: a.totalMarks,
           facultyName: a.faculty?.name || "Unknown Faculty",
-          submittedOn: null,
-          grade: null,
-          submissionText: null,
-          submissionFile: null,
-          ...a // Spread remaining props
+          submittedOn: a.submittedOn,
+          grade: a.grade,
+          feedback: a.feedback,
+          submissionText: a.mySubmission?.submissionText,
+          submissionFile: a.mySubmission?.fileUrl,
+          ...a
         }));
         // TODO: Logic to check if *this* student submitted needs `submissions` array check.
         // Assuming API returns `submissions` populated, we can optimize.
@@ -70,7 +82,7 @@ const StudentAssignments = () => {
       if (submissionText) formData.append("submissionText", submissionText);
       if (selectedFile) formData.append("file", selectedFile);
 
-      const res = await fetch(`http://localhost:4000/api/assignments/${submittingAssignment.id}/submit`, {
+      const res = await fetch(`${API_BASE}/assignments/${submittingAssignment.id}/submit`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData // Content-Type handled automatically
@@ -96,6 +108,7 @@ const StudentAssignments = () => {
   const pendingAssignments = assignments.filter(a => a.status === "pending");
   const submittedAssignments = assignments.filter(a => a.status === "submitted");
   const gradedAssignments = assignments.filter(a => a.status === "graded");
+  const allSubmittedAssignments = assignments.filter(a => a.status === "submitted" || a.status === "graded");
 
   // Re-use existing filters...
   const filteredAssignments = assignments.filter(assignment =>
@@ -141,6 +154,32 @@ const StudentAssignments = () => {
     setSubmissionDialog(true);
   };
 
+  const handleDownloadMySubmission = async (assignment: any) => {
+    try {
+      if (!assignment.mySubmission) return;
+      const response = await fetch(`${API_BASE}/assignments/${assignment.id}/submissions/${assignment.mySubmission.studentId}/download`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', 'my_submission.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast({ title: "Success", description: "Download started" });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Error", description: "Failed to download submission", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background/95 to-primary/5 p-6">
       <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
@@ -157,8 +196,8 @@ const StudentAssignments = () => {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
+        <div className="flex flex-col md:flex-row gap-4">
+          <Card className="flex-1 backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
             </CardHeader>
@@ -166,32 +205,31 @@ const StudentAssignments = () => {
               <div className="text-2xl font-bold">{assignments.length}</div>
             </CardContent>
           </Card>
-          {/* ... Other stats (simplified for brevity, logic remains same) */}
+          <Card className="flex-1 backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">{pendingAssignments.length}</div>
+            </CardContent>
+          </Card>
+          <Card className="flex-1 backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Submitted</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{submittedAssignments.length}</div>
+            </CardContent>
+          </Card>
+          <Card className="flex-1 backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Graded</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">{gradedAssignments.length}</div>
+            </CardContent>
+          </Card>
         </div>
-        <Card className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{pendingAssignments.length}</div>
-          </CardContent>
-        </Card>
-        <Card className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Submitted</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{submittedAssignments.length}</div>
-          </CardContent>
-        </Card>
-        <Card className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Graded</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{gradedAssignments.length}</div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Search */}
@@ -206,80 +244,68 @@ const StudentAssignments = () => {
       </div>
 
       {/* Assignments Tabs */}
-      <Tabs defaultValue="all" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
           <TabsTrigger value="all">All Assignments</TabsTrigger>
           <TabsTrigger value="pending">Pending</TabsTrigger>
           <TabsTrigger value="submitted">Submitted</TabsTrigger>
-          <TabsTrigger value="graded">Graded</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
           {filteredAssignments.map((assignment) => (
-            <Card key={assignment.id} className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20 hover:shadow-lg transition-all duration-300">
-              <CardHeader>
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-primary" />
-                      {assignment.title}
-                    </CardTitle>
-                    <CardDescription>{assignment.subject}</CardDescription>
+            <Card key={assignment.id} className="border-0 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg">
+                      <FileText className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">{assignment.title}</h3>
+                      <p className="text-sm text-muted-foreground">{assignment.subject}</p>
+                    </div>
                   </div>
                   {getStatusBadge(assignment.status)}
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
                   <div>
-                    <p className="text-sm text-muted-foreground">Due Date</p>
+                    <p className="text-sm text-muted-foreground mb-1">Due Date</p>
                     <p className="font-medium flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
                       {new Date(assignment.dueDate).toLocaleDateString('en-IN')}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Marks</p>
-                    <p className="font-medium">{assignment.marks}</p>
+                    <p className="text-sm text-muted-foreground mb-1">Total Marks</p>
+                    <p className="font-medium">{assignment.marks || assignment.totalMarks}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Submitted On</p>
+                    <p className="text-sm text-muted-foreground mb-1">Submitted On</p>
                     <p className="font-medium">
                       {assignment.submittedOn ? new Date(assignment.submittedOn).toLocaleDateString('en-IN') : '-'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Grade</p>
+                    <p className="text-sm text-muted-foreground mb-1">Grade</p>
                     <p className="font-medium">{assignment.grade || '-'}</p>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  {assignment.status === "pending" && (
-                    <Button className="gap-2" onClick={() => openSubmissionDialog(assignment)}>
+
+                <div className="flex justify-start gap-3">
+                  {assignment.status === "pending" ? (
+                    <Button className="gap-2 px-6" onClick={() => openSubmissionDialog(assignment)}>
                       <Upload className="h-4 w-4" />
                       Submit Assignment
                     </Button>
+                  ) : (
+                    <Button variant="outline" className="gap-2" disabled>
+                      <CheckCircle className="h-4 w-4" />
+                      Submitted
+                    </Button>
                   )}
-                  <Button variant="outline" onClick={() => setSelectedAssignment(assignment)}>View Details</Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </TabsContent>
-
-        <TabsContent value="pending" className="space-y-4">
-          {pendingAssignments.map((assignment) => (
-            <Card key={assignment.id} className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
-              <CardHeader>
-                <CardTitle>{assignment.title}</CardTitle>
-                <CardDescription>{assignment.subject}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <span>Due: {new Date(assignment.dueDate).toLocaleDateString('en-IN')}</span>
-                  <Button className="gap-2" onClick={() => openSubmissionDialog(assignment)}>
-                    <Upload className="h-4 w-4" />
-                    Submit
+                  <Button variant="outline" onClick={() => setSelectedAssignment(assignment)}>
+                    View Details
                   </Button>
                 </div>
               </CardContent>
@@ -287,40 +313,113 @@ const StudentAssignments = () => {
           ))}
         </TabsContent>
 
-        <TabsContent value="submitted" className="space-y-4">
-          {submittedAssignments.map((assignment) => (
-            <Card key={assignment.id} className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
-              <CardHeader>
-                <CardTitle>{assignment.title}</CardTitle>
-                <CardDescription>{assignment.subject}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>Submitted on: {assignment.submittedOn && new Date(assignment.submittedOn).toLocaleDateString('en-IN')}</p>
-                <p className="text-sm text-muted-foreground mt-2">Awaiting grading...</p>
-              </CardContent>
-            </Card>
-          ))}
+        <TabsContent value="pending" className="space-y-4">
+          {pendingAssignments.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">No pending assignments</div>
+          ) : (
+            pendingAssignments.map((assignment) => (
+              <Card key={assignment.id} className="border-0 shadow-sm hover:shadow-md transition-all duration-300">
+                <CardContent className="p-6">
+                  {/* Reusing the same card structure for consistency, simplified for brevity here since logic is identical */}
+                  <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <FileText className="h-6 w-6 text-primary" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground">{assignment.title}</h3>
+                        <p className="text-sm text-muted-foreground">{assignment.subject}</p>
+                      </div>
+                    </div>
+                    {getStatusBadge(assignment.status)}
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Due Date</p>
+                      <p className="font-medium flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        {new Date(assignment.dueDate).toLocaleDateString('en-IN')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Total Marks</p>
+                      <p className="font-medium">{assignment.marks || assignment.totalMarks}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Submitted On</p>
+                      <p className="font-medium">-</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Grade</p>
+                      <p className="font-medium">-</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-start gap-3">
+                    <Button className="gap-2 px-6" onClick={() => openSubmissionDialog(assignment)}>
+                      <Upload className="h-4 w-4" />
+                      Submit Assignment
+                    </Button>
+                    <Button variant="outline" onClick={() => setSelectedAssignment(assignment)}>
+                      View Details
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </TabsContent>
 
-        <TabsContent value="graded" className="space-y-4">
-          {gradedAssignments.map((assignment) => (
-            <Card key={assignment.id} className="backdrop-blur-xl bg-white/50 dark:bg-gray-900/50 border-white/20">
-              <CardHeader>
-                <CardTitle>{assignment.title}</CardTitle>
-                <CardDescription>{assignment.subject}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p>Grade: <span className="font-bold text-green-600">{assignment.grade}</span></p>
-                    <p className="text-sm text-muted-foreground">Submitted: {assignment.submittedOn && new Date(assignment.submittedOn).toLocaleDateString('en-IN')}</p>
+        <TabsContent value="submitted" className="space-y-4">
+          {allSubmittedAssignments.map((assignment) => (
+            <Card key={assignment.id} className="border-0 shadow-sm hover:shadow-md transition-all duration-300">
+              <CardContent className="p-6">
+                {/* Reusing Card Structure */}
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <CheckCircle className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">{assignment.title}</h3>
+                      <p className="text-sm text-muted-foreground">{assignment.subject}</p>
+                    </div>
                   </div>
-                  <Button variant="outline">View Feedback</Button>
+                  {getStatusBadge(assignment.status)}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Due Date</p>
+                    <p className="font-medium flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      {new Date(assignment.dueDate).toLocaleDateString('en-IN')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Total Marks</p>
+                    <p className="font-medium">{assignment.marks || assignment.totalMarks}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Submitted On</p>
+                    <p className="font-medium">
+                      {assignment.submittedOn ? new Date(assignment.submittedOn).toLocaleDateString('en-IN') : '-'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Grade</p>
+                    <p className="font-medium">{assignment.grade || '-'}</p>
+                  </div>
+                </div>
+                <div className="flex justify-start gap-3">
+                  <Button variant="outline" onClick={() => setSelectedAssignment(assignment)}>
+                    View Details
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
         </TabsContent>
+
+
       </Tabs>
 
       {/* Submission Dialog */}
@@ -504,6 +603,36 @@ const StudentAssignments = () => {
               </div>
             )}
 
+            {selectedAssignment?.submissionText && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">My Submission Notes</p>
+                <Card className="bg-muted/30 border-primary/10">
+                  <CardContent className="pt-4">
+                    <p className="text-sm italic text-foreground">"{selectedAssignment.submissionText}"</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {selectedAssignment?.submissionFile && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-2">Submitted File</p>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-4 p-4 h-auto rounded-2xl border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all group"
+                  onClick={() => handleDownloadMySubmission(selectedAssignment)}
+                >
+                  <div className="bg-primary/20 p-2 rounded-xl group-hover:scale-110 transition-transform">
+                    <FileText className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-foreground">Download My Submission</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest leading-none mt-1">Download to your device</p>
+                  </div>
+                </Button>
+              </div>
+            )}
+
             <div className="flex gap-2">
               {selectedAssignment?.status === "pending" && (
                 <Button
@@ -523,7 +652,7 @@ const StudentAssignments = () => {
         </DialogContent>
       </Dialog>
     </div>
-  
+
   );
 };
 

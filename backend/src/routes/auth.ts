@@ -5,9 +5,60 @@ import User from '../models/User';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { authenticate, AuthRequest } from '../middlewares/auth';
 import { requireRole } from '../middlewares/requireRole';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+import Activity from '../models/Activity'; // Import Activity model
 
 const router = Router();
 const SALT_ROUNDS = 10;
+
+// Configure Multer for Profile Images
+const uploadDir = path.join(process.cwd(), 'uploads', 'profiles');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadDir),
+  filename: (_req, file, cb) => cb(null, `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`)
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|avif|afif|jfif/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error('Only images are allowed'));
+  }
+});
+
+/**
+ * POST /api/auth/profile-image
+ * Upload profile picture
+ */
+router.post('/profile-image', authenticate, upload.single('image'), async (req: AuthRequest, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const imageUrl = `/uploads/profiles/${req.file.filename}`;
+
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { profileImage: imageUrl },
+      { new: true }
+    ).select('-passwordHash -refreshToken');
+
+    res.json({ message: 'Profile image uploaded', profileImage: imageUrl, user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error during upload' });
+  }
+});
 
 /**
  * POST /api/auth/login
@@ -24,13 +75,23 @@ router.post('/login', async (req, res) => {
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
-    const payload = { id: user._id, role: user.role, email: user.email, name: user.name };
+    const payload = {
+      id: user._id,
+      role: user.role,
+      email: user.email,
+      name: user.name,
+      department: user.department,
+      profileImage: user.profileImage
+    };
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken({ id: user._id });
 
     // persist refresh token
     user.refreshToken = refreshToken;
     await user.save();
+
+    // Log Activity
+    await Activity.create({ userId: user._id, action: 'LOGIN', description: 'Logged in successfully' });
 
     return res.json({ accessToken, refreshToken, user: payload });
   } catch (err) {
@@ -60,7 +121,14 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ message: 'Refresh token invalidated' });
     }
 
-    const payload = { id: user._id, role: user.role, email: user.email, name: user.name };
+    const payload = {
+      id: user._id,
+      role: user.role,
+      email: user.email,
+      name: user.name,
+      department: user.department,
+      profileImage: user.profileImage
+    };
     const accessToken = signAccessToken(payload);
     const newRefreshToken = signRefreshToken({ id: user._id });
 
@@ -126,8 +194,11 @@ router.put('/profile', authenticate, async (req: AuthRequest, res) => {
   try {
     // Whitelist allowed fields for update
     const allowedUpdates = [
-      'phone', 'address', 'bio', 'dob', 'bloodGroup', 'gender',
-      'fatherName', 'motherName', 'emergencyContact', 'profileImage'
+      'phone', 'address', 'bio', 'dob', 'bloodGroup', 'gender', 'email',
+      'fatherName', 'motherName', 'emergencyContact', 'profileImage',
+      'department', 'subjects',
+      'designation', 'experience', 'qualification', 'rating',
+      'rollNumber', 'batch', 'section', 'mentor'
     ];
 
     const updates: any = {};
@@ -137,6 +208,17 @@ router.put('/profile', authenticate, async (req: AuthRequest, res) => {
       }
     });
 
+    // Email Restriction Check
+    if (updates.email) {
+      const currentUser = await User.findById(req.user.id);
+      if (currentUser?.isEmailChanged && updates.email !== currentUser.email) {
+        return res.status(400).json({ message: 'Email can only be changed once.' });
+      }
+      if (currentUser && updates.email !== currentUser.email) {
+        updates.isEmailChanged = true;
+      }
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { $set: updates },
@@ -144,6 +226,10 @@ router.put('/profile', authenticate, async (req: AuthRequest, res) => {
     ).select('-passwordHash -refreshToken');
 
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Log Activity
+    await Activity.create({ userId: req.user.id, action: 'PROFILE_UPDATE', description: 'Updated profile details' });
+
     res.json(user);
   } catch (err) {
     console.error(err);
@@ -268,6 +354,20 @@ router.post('/reset-password', async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/auth/activities
+ * Fetch recent user activities
+ */
+router.get('/activities', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const activities = await Activity.find({ userId: req.user.id }).sort({ createdAt: -1 }).limit(10);
+    res.json(activities);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

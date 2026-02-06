@@ -5,59 +5,68 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, MapPin, Users, BookOpen, Plus, Filter } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const ClassSchedule = () => {
   const [selectedDay, setSelectedDay] = useState('all');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [scheduleData, setScheduleData] = useState<any[]>([]);
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const isFacultyOrAdmin = user.role === 'Faculty' || user.role === 'Admin';
 
-  const scheduleData = [
-    {
-      id: 1,
-      time: '09:00 - 10:00',
-      monday: { subject: 'Data Structures', faculty: 'Dr. Priya Sharma', room: 'CS-101', students: 45 },
-      tuesday: { subject: 'Machine Learning', faculty: 'Prof. Rahul Patel', room: 'CS Lab 2', students: 38 },
-      wednesday: { subject: 'Database Systems', faculty: 'Dr. Priya Sharma', room: 'CS-205', students: 42 },
-      thursday: { subject: 'Algorithms', faculty: 'Dr. Priya Sharma', room: 'CS-101', students: 40 },
-      friday: { subject: 'Software Engineering', faculty: 'Prof. Amit Kumar', room: 'CS-302', students: 35 },
-    },
-    {
-      id: 2,
-      time: '10:00 - 11:00',
-      monday: { subject: 'Machine Learning', faculty: 'Prof. Rahul Patel', room: 'CS Lab 2', students: 38 },
-      tuesday: { subject: 'Database Systems', faculty: 'Dr. Priya Sharma', room: 'CS-205', students: 42 },
-      wednesday: { subject: 'Data Structures', faculty: 'Dr. Priya Sharma', room: 'CS-101', students: 45 },
-      thursday: { subject: 'Software Engineering', faculty: 'Prof. Amit Kumar', room: 'CS-302', students: 35 },
-      friday: { subject: 'Algorithms', faculty: 'Dr. Priya Sharma', room: 'CS-101', students: 40 },
-    },
-    {
-      id: 3,
-      time: '11:30 - 12:30',
-      monday: null,
-      tuesday: { subject: 'Digital Electronics', faculty: 'Dr. Anita Gupta', room: 'ECE Lab 1', students: 52 },
-      wednesday: { subject: 'Microprocessors', faculty: 'Dr. Anita Gupta', room: 'ECE-201', students: 48 },
-      thursday: { subject: 'VLSI Design', faculty: 'Prof. Suresh Reddy', room: 'ECE Lab 2', students: 35 },
-      friday: { subject: 'Communication Systems', faculty: 'Dr. Rajesh Nair', room: 'ECE-105', students: 44 },
-    },
-    {
-      id: 4,
-      time: '02:00 - 03:00',
-      monday: { subject: 'Thermodynamics', faculty: 'Prof. Vikram Singh', room: 'MECH-101', students: 41 },
-      tuesday: { subject: 'Fluid Mechanics', faculty: 'Dr. Sanjay Joshi', room: 'MECH Lab', students: 38 },
-      wednesday: { subject: 'Manufacturing Processes', faculty: 'Prof. Vikram Singh', room: 'Workshop', students: 35 },
-      thursday: { subject: 'Machine Design', faculty: 'Dr. Ramesh Gupta', room: 'MECH-205', students: 42 },
-      friday: { subject: 'Heat Transfer', faculty: 'Dr. Sanjay Joshi', room: 'MECH-101', students: 39 },
-    },
-    {
-      id: 5,
-      time: '03:00 - 04:00',
-      monday: { subject: 'Lab Session', faculty: 'Dr. Priya Sharma', room: 'CS Lab 1', students: 22 },
-      tuesday: { subject: 'Lab Session', faculty: 'Prof. Rahul Patel', room: 'CS Lab 2', students: 19 },
-      wednesday: { subject: 'Lab Session', faculty: 'Dr. Anita Gupta', room: 'ECE Lab 1', students: 26 },
-      thursday: { subject: 'Lab Session', faculty: 'Prof. Vikram Singh', room: 'MECH Lab', students: 21 },
-      friday: { subject: 'Tutorial', faculty: 'Various', room: 'Multiple', students: 180 },
-    }
-  ];
+  useEffect(() => {
+    const fetchSchedule = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api"}/dashboard/schedule?day=all`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const rawData = await res.json();
+
+          // Transform flat list to time-slot based grid
+          // This is a simplification. Real timetable logic is complex.
+          // We'll map standard slots.
+          const timeSlots = [
+            '09:00 - 10:00',
+            '10:00 - 11:00',
+            '11:00 - 12:00',
+            '12:00 - 01:00',
+            '02:00 - 03:00',
+            '03:00 - 04:00'
+          ];
+
+          const grid = timeSlots.map((slot, index) => {
+            const row: any = { id: index, time: slot };
+            ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+              // Find class in this slot for this day
+              // Logic: check if item.startTime matches slot start approx
+              const found = rawData.find((item: any) =>
+                item.dayOfWeek.toLowerCase() === day &&
+                item.startTime.startsWith(slot.split(' ')[0]) // Simple matching
+              );
+              if (found) {
+                row[day] = {
+                  subject: found.course,
+                  faculty: found.facultyName,
+                  room: found.room,
+                  students: found.studentsCount || 40
+                };
+              } else {
+                row[day] = null;
+              }
+            });
+            return row;
+          });
+
+          setScheduleData(grid);
+        }
+      } catch (err) {
+        console.error("Failed to fetch schedule", err);
+      }
+    };
+    fetchSchedule();
+  }, []);
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
   const departments = ['Computer Science', 'Electronics', 'Mechanical', 'Civil'];
@@ -85,14 +94,14 @@ const ClassSchedule = () => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       className="space-y-6 p-6"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
       <BreadcrumbNav />
-      
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
@@ -100,10 +109,12 @@ const ClassSchedule = () => {
           </h1>
           <p className="text-muted-foreground mt-2">Manage and view class timetables across departments</p>
         </div>
-        <Button className="glass-card">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Schedule
-        </Button>
+        {isFacultyOrAdmin && (
+          <Button className="glass-card">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Schedule
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -235,8 +246,8 @@ const ClassSchedule = () => {
                 </thead>
                 <tbody>
                   {scheduleData.map((slot, index) => (
-                    <motion.tr 
-                      key={slot.id} 
+                    <motion.tr
+                      key={slot.id}
                       className="border-b hover:bg-accent/50 transition-colors"
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -251,7 +262,7 @@ const ClassSchedule = () => {
                       {days.map((day) => {
                         const dayKey = day.toLowerCase() as keyof typeof slot;
                         const classInfo = slot[dayKey] as any;
-                        
+
                         return (
                           <td key={day} className="p-3">
                             {classInfo ? (

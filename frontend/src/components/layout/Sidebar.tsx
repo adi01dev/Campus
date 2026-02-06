@@ -27,11 +27,16 @@ import {
   Brain,
   HelpCircle
 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+const BACKEND_URL = API_BASE.replace('/api', '');
 
 interface User {
   email: string;
   role: string;
   name: string;
+  profileImage?: string;
 }
 
 interface SidebarProps {
@@ -54,15 +59,15 @@ export const Sidebar = ({ user }: SidebarProps) => {
 
   const getNavigationItems = () => {
     const baseItems = [
-      { 
-        icon: LayoutDashboard, 
-        label: 'Dashboard', 
+      {
+        icon: LayoutDashboard,
+        label: 'Dashboard',
         path: `/dashboard/${user.role.toLowerCase()}`,
         badge: null
       },
-      { 
-        icon: User, 
-        label: 'Profile', 
+      {
+        icon: User,
+        label: 'Profile',
         path: `/profile`,
         badge: null
       },
@@ -95,7 +100,10 @@ export const Sidebar = ({ user }: SidebarProps) => {
         { icon: BookOpen, label: 'My Courses', path: '/my-courses', badge: null },
         { icon: Calendar, label: 'Class Schedule', path: '/class-schedule', badge: null },
         { icon: UserCheck, label: 'My Attendance', path: '/my-attendance', badge: null },
-        { icon: FileText, label: 'Assignments', path: '/student-assignments', badge: '3 Due' },
+        {
+          icon: FileText, label: 'Assignments', path: "/student/assignments",
+          badge: '3 Due'
+        },
         { icon: CreditCard, label: 'Fee Payment', path: '/fee-payment', badge: 'Due' },
         { icon: MessageSquare, label: 'MoU Requests', path: '/mou-requests', badge: null },
         { icon: Brain, label: 'AI Recommendations', path: '/ai-recommendations', badge: 'New' },
@@ -162,15 +170,21 @@ export const Sidebar = ({ user }: SidebarProps) => {
             <p className="text-xs text-sidebar-foreground/60">ERP System</p>
           </div>
         </div>
-        
+
         {/* User Info */}
         <div className="bg-sidebar-accent/30 rounded-lg p-3 border border-sidebar-border/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-              <span className="text-primary-foreground font-semibold">
+            <Avatar className="w-10 h-10">
+              {user.profileImage && (
+                <AvatarImage
+                  src={user.profileImage.startsWith('http') ? user.profileImage : `${BACKEND_URL}${user.profileImage}`}
+                  className="object-cover"
+                />
+              )}
+              <AvatarFallback className="bg-blue-600 text-white font-semibold">
                 {user.name.split(' ').map(n => n[0]).join('')}
-              </span>
-            </div>
+              </AvatarFallback>
+            </Avatar>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sidebar-foreground truncate">{user.name}</p>
               <div className="flex items-center gap-2 mt-1">
@@ -192,8 +206,8 @@ export const Sidebar = ({ user }: SidebarProps) => {
               to={item.path}
               className={`
                 flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group
-                ${isActiveLink(item.path) 
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm border border-sidebar-border/50' 
+                ${isActiveLink(item.path)
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-sm border border-sidebar-border/50'
                   : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
                 }
               `}
@@ -202,11 +216,11 @@ export const Sidebar = ({ user }: SidebarProps) => {
                 <item.icon className={`w-4 h-4 ${isActiveLink(item.path) ? getRoleColor(user.role) : ''}`} />
                 <span className="font-medium text-sm">{item.label}</span>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 {item.badge && (
-                  <Badge 
-                    variant={item.badge === 'New' || item.badge === 'Beta' || item.badge === 'Live' ? 'secondary' : 'destructive'} 
+                  <Badge
+                    variant={item.badge === 'New' || item.badge === 'Beta' || item.badge === 'Live' ? 'secondary' : 'destructive'}
                     className="text-xs px-1.5 py-0"
                   >
                     {item.badge}
@@ -232,7 +246,7 @@ export const Sidebar = ({ user }: SidebarProps) => {
             <span className="font-medium text-sm">AI Assistant</span>
             <Badge variant="secondary" className="text-xs px-1.5 py-0 ml-auto">AI</Badge>
           </Link>
-          
+
           <Link
             to="/help"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
@@ -253,7 +267,7 @@ export const Sidebar = ({ user }: SidebarProps) => {
             <Settings className="w-4 h-4" />
             <span className="font-medium text-sm">Settings</span>
           </Link>
-          
+
           <Button
             variant="ghost"
             onClick={handleLogout}

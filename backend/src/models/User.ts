@@ -12,6 +12,7 @@ export interface IUser extends Document {
   semester?: string;
   subjects?: string[];
   isMoUCoordinator: boolean;
+  isEmailChanged?: boolean;
   phone?: string;
   address?: string;
   bio?: string;
@@ -49,6 +50,7 @@ const UserSchema = new Schema<IUser>({
   semester: { type: String }, // ✅ added for Student details
   subjects: [{ type: String }], // ✅ added for Faculty (assigned by Admin)
   isMoUCoordinator: { type: Boolean, default: false },
+  isEmailChanged: { type: Boolean, default: false },
   // Extended Profile Fields
   phone: { type: String },
   address: { type: String },

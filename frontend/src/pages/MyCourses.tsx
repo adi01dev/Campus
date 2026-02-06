@@ -7,140 +7,169 @@ import { motion } from "framer-motion";
 import {
   BookOpen,
   Clock,
-  Users,
   Calendar,
   FileText,
   Video,
   Download,
-  Upload,
+  Upload as UploadIcon,
   ExternalLink,
-  Star,
   CheckCircle,
   AlertCircle,
   Play,
   Award,
   Target,
   TrendingUp,
+  Image,
+  Eye,
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
+const BACKEND_URL = API_BASE.replace('/api', '');
 
 const MyCourses = () => {
-  const courseStats = [
-    {
-      title: "Enrolled Courses",
-      value: "8",
-      icon: BookOpen,
-      color: "text-primary",
-    },
-    {
-      title: "Completed",
-      value: "3",
-      icon: CheckCircle,
-      color: "text-success",
-    },
-    { title: "In Progress", value: "4", icon: Clock, color: "text-warning" },
-    { title: "Avg Grade", value: "A-", icon: Award, color: "text-secondary" },
-  ];
 
-  const courses = [
-    {
-      id: 1,
-      title: "Data Structures & Algorithms",
-      code: "CS301",
-      instructor: "Dr. Priya Sharma",
-      semester: "6th Semester",
-      progress: 85,
-      grade: "A+",
-      status: "active",
-      nextClass: "Tomorrow 9:00 AM",
-      assignments: 2,
-      materials: 24,
-      videos: 12,
-      description:
-        "Advanced data structures, algorithm analysis, and problem-solving techniques",
-      materialsLink:
-        "https://drive.google.com/file/d/1j1YeVU0UmTNZ3ks86TEa1KCiQsd8q9-k/view?usp=sharing",
-    },
-    
-    {
-      id: 2,
-      title: "Software Engineering",
-      code: "CS303",
-      instructor: "Dr. Anita Singh",
-      semester: "6th Semester",
-      progress: 90,
-      grade: "A",
-      status: "active",
-      nextClass: "Friday 11:00 AM",
-      assignments: 0,
-      materials: 32,
-      videos: 15,
-      description:
-        "Software development lifecycle, methodologies, and project management",
-      materialsLink: "https://drive.google.com/file/d/1fSX-zMg_dH1Y4_mJtgBY9DBtdNkz_mIQ/view?usp=drive_link",
-    },
-    {
-      id: 3,
-      title: "Machine Learning",
-      code: "CS304",
-      instructor: "Prof. Vikram Gupta",
-      semester: "6th Semester",
-      progress: 65,
-      grade: "B+",
-      status: "active",
-      nextClass: "Monday 10:00 AM",
-      assignments: 3,
-      materials: 28,
-      videos: 20,
-      description:
-        "Introduction to ML algorithms, neural networks, and practical applications",
-      materialsLink: "https://drive.google.com/file/d/1xerMgzaFYxMcLD6GYZXROV3btw7M2Laa/view?usp=sharing",
-    },
-    {
-      id: 4,
-      title: "Operating Systems",
-      code: "CS205",
-      instructor: "Dr. Neha Patel",
-      semester: "5th Semester",
-      progress: 100,
-      grade: "A+",
-      status: "completed",
-      nextClass: "Course Completed",
-      assignments: 0,
-      materials: 40,
-      videos: 25,
-      description:
-        "Process management, memory management, and system programming",
-      materialsLink:
-        "https://drive.google.com/file/d/16LjH9bbJvOO-egwrpO8evFnu-TPGgrHq/view?usp=sharing",
-    },
-  ];
+  const [courses, setCourses] = useState<any[]>([]);
+  const [recentMaterials, setRecentMaterials] = useState<any[]>([]);
+  const [quickActions, setQuickActions] = useState<any>(null);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const recentActivity = [
-    {
-      type: "assignment",
-      course: "Machine Learning",
-      activity: "Assignment 3 submitted",
-      time: "2 hours ago",
-    },
-    {
-      type: "grade",
-      course: "Software Engineering",
-      activity: "Project graded: A",
-      time: "1 day ago",
-    },
-    {
-      type: "material",
-      course: "Database Systems",
-      activity: "New lecture notes uploaded",
-      time: "2 days ago",
-    },
-    {
-      type: "announcement",
-      course: "Data Structures",
-      activity: "Exam schedule announced",
-      time: "3 days ago",
-    },
-  ];
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api"}/student/courses`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          setCourses(await res.json());
+        }
+      } catch (err) {
+        console.error("Failed to fetch courses", err);
+      }
+    };
+
+    // Fetch recent materials for study materials section
+    const fetchRecentMaterials = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api"}/materials/recent`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          // Map to match the UI expectations, handling potential missing fields with defaults
+          setRecentMaterials(data.map((item: any) => ({
+            ...item,
+            size: item.fileSize ? formatBytes(item.fileSize) : '0 B',
+            downloads: item.downloads || 0,
+            uploadedAtFormatted: new Date(item.uploadedAt).toLocaleString()
+          })));
+        }
+      } catch (err) {
+        console.error("Failed to fetch recent materials", err);
+      }
+    };
+
+    const fetchQuickActions = async () => {
+      try {
+        const token = localStorage.getItem('accessToken');
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api"}/dashboard/stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setQuickActions(data.quickActions);
+        }
+      } catch (err) {
+        console.error("Failed to fetch quick actions", err);
+      }
+    };
+
+    fetchCourses();
+    fetchRecentMaterials();
+    fetchQuickActions();
+  }, []);
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const getFileIcon = (type: string) => {
+    switch (type) {
+      case 'pdf':
+      case 'document':
+        return <FileText className="w-5 h-5 text-red-500" />;
+      case 'image':
+        return <Image className="w-5 h-5 text-green-500" />;
+      case 'video':
+        return <Video className="w-5 h-5 text-blue-500" />;
+      default:
+        return <FileText className="w-5 h-5 text-gray-500" />;
+    }
+  };
+
+  const handleView = async (id: string, url: string) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(`${API_BASE}/materials/${id}/view`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setRecentMaterials(prev => prev.map(item =>
+        item._id === id ? { ...item, views: (item.views || 0) + 1 } : item
+      ));
+
+      const cleanUrl = url.replace(/^\/+/, '');
+      const fullUrl = url.startsWith('http') ? url : `${BACKEND_URL}/${cleanUrl}`;
+      window.open(fullUrl, '_blank');
+    } catch (err) {
+      console.error("View error", err);
+    }
+  };
+
+  const handleDownload = async (id: string, url: string, filename: string) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const downloadUrl = `${API_BASE}/materials/${id}/download`;
+
+      const response = await fetch(downloadUrl, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error("Download failed");
+
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+
+      setRecentMaterials(prev => prev.map(item =>
+        item._id === id ? { ...item, downloads: (item.downloads || 0) + 1 } : item
+      ));
+
+      toast({ title: "Success", description: "Download started" });
+    } catch (err) {
+      console.error("Download error", err);
+      toast({ title: "Error", description: "Failed to download file", variant: "destructive" });
+    }
+  };
 
   return (
     <motion.div
@@ -167,234 +196,103 @@ const MyCourses = () => {
             materials
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" size="sm">
-            <Calendar className="w-4 h-4 mr-2" />
-            Class Schedule
-          </Button>
-          <Button variant="outline" size="sm">
-            <TrendingUp className="w-4 h-4 mr-2" />
-            Performance
-          </Button>
-        </div>
       </motion.div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {courseStats.map((stat, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: index * 0.1 }}
-          >
-            <Card className="glass-effect border-0 shadow-card hover:shadow-elegant transition-all duration-300 hover-lift">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-xs font-medium">
-                      {stat.title}
-                    </p>
-                    <p className="text-2xl font-bold mt-1">{stat.value}</p>
-                  </div>
-                  <div className="p-2 rounded-lg bg-gradient-primary">
-                    <stat.icon className="w-5 h-5 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Courses List */}
-        <div className="xl:col-span-2">
+        {/* Recent Study Materials - Replaces Recent Activity */}
+        <div className="xl:col-span-3"> {/* Expanded to full width since courses list is gone */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
           >
             <Card className="glass-effect border-0 shadow-card">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="w-5 h-5 text-primary" />
-                  Enrolled Courses
+                  Recent Study Materials
                 </CardTitle>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate('/upload-materials')}>
+                  View All
+                </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {courses.map((course, index) => (
-                    <motion.div
-                      key={course.id}
-                      className="p-4 bg-muted/30 rounded-lg border border-border/50 hover:bg-muted/50 transition-colors"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-semibold text-foreground">
-                              {course.title}
-                            </h4>
-                            <Badge variant="outline" className="text-xs">
-                              {course.code}
-                            </Badge>
-                            <Badge
-                              variant={
-                                course.status === "completed"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                              className="text-xs"
-                            >
-                              {course.status}
-                            </Badge>
-                            {course.grade && (
-                              <Badge
-                                variant="outline"
-                                className="text-xs font-bold"
-                              >
-                                Grade: {course.grade}
-                              </Badge>
-                            )}
+                <div className="space-y-3">
+                  {recentMaterials.length === 0 ? (
+                    <p className="text-muted-foreground text-sm text-center">No recent materials</p>
+                  ) : (
+                    recentMaterials.slice(0, 3).map((material, index) => (
+                      <motion.div
+                        key={index}
+                        className="p-4 border rounded-lg glass-card hover:bg-accent/50 transition-colors"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            {getFileIcon(material.fileType)}
                           </div>
 
-                          <p className="text-sm text-muted-foreground mb-2">
-                            {course.description}
-                          </p>
-
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-3">
-                            <span>Instructor: {course.instructor}</span>
-                            <span>•</span>
-                            <span>{course.semester}</span>
-                            <span>•</span>
-                            <span>Next: {course.nextClass}</span>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-muted-foreground">
-                                Progress
-                              </span>
-                              <span className="text-sm font-medium">
-                                {course.progress}%
-                              </span>
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h3 className="font-medium text-sm">{material.title}</h3>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                  <Badge variant="outline" className="text-xs">{material.courseCode}</Badge>
+                                  <Badge variant="secondary" className="text-xs">{material.fileType}</Badge>
+                                </div>
+                              </div>
+                              <div className="flex gap-1 relative z-20">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 bg-primary/5 hover:bg-primary hover:text-white transition-all shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleView(material._id, material.fileUrl);
+                                  }}
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0 bg-secondary/5 hover:bg-secondary hover:text-white transition-all shadow-sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDownload(material._id, material.fileUrl, material.title);
+                                  }}
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
                             </div>
-                            <Progress value={course.progress} className="h-2" />
+
+                            <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
+                              <div>
+                                <p><span className="font-medium">Size:</span> {material.size}</p>
+                                <p><span className="font-medium">Downloads:</span> {material.downloads}</p>
+                              </div>
+                              <div>
+                                <p><span className="font-medium">Uploaded by:</span> {material.uploadedBy}</p>
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  <span>{material.uploadedAtFormatted}</span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-
-                        <div className="flex flex-col gap-2 min-w-[200px]">
-                          <div className="grid grid-cols-3 gap-2 text-xs text-center">
-                            <div className="p-2 bg-muted/50 rounded">
-                              <FileText className="w-4 h-4 mx-auto mb-1" />
-                              <p>{course.materials} Materials</p>
-                            </div>
-                            <div className="p-2 bg-muted/50 rounded">
-                              <Video className="w-4 h-4 mx-auto mb-1" />
-                              <p>{course.videos} Videos</p>
-                            </div>
-                            <div className="p-2 bg-muted/50 rounded">
-                              <AlertCircle className="w-4 h-4 mx-auto mb-1" />
-                              <p>{course.assignments} Due</p>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2">
-                            {/* Open button (kept same) */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={() => {
-                                if (course.materialsLink) {
-                                  window.open(course.materialsLink, "_blank");
-                                } else {
-                                  alert(
-                                    "No materials link available for this course."
-                                  );
-                                }
-                              }}
-                            >
-                              <ExternalLink className="w-4 h-4 mr-1" />
-                              Open
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
           </motion.div>
         </div>
-
-        {/* Recent Activity */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <Card className="glass-effect border-0 shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-primary" />
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentActivity.map((activity, index) => (
-                  <motion.div
-                    key={index}
-                    className="flex items-start gap-3 p-3 bg-muted/20 rounded-lg"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                  >
-                    <div
-                      className={`p-1 rounded-full mt-1 ${
-                        activity.type === "grade"
-                          ? "bg-success/20"
-                          : activity.type === "assignment"
-                          ? "bg-primary/20"
-                          : activity.type === "material"
-                          ? "bg-secondary/20"
-                          : "bg-warning/20"
-                      }`}
-                    >
-                      {activity.type === "grade" ? (
-                        <Star className="w-3 h-3 text-success" />
-                      ) : activity.type === "assignment" ? (
-                        <FileText className="w-3 h-3 text-primary" />
-                      ) : activity.type === "material" ? (
-                        <Download className="w-3 h-3 text-secondary" />
-                      ) : (
-                        <AlertCircle className="w-3 h-3 text-warning" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">
-                        {activity.activity}
-                      </p>
-                      <div className="flex justify-between items-center mt-1">
-                        <Badge variant="outline" className="text-xs">
-                          {activity.course}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          {activity.time}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
 
       {/* Quick Actions */}
@@ -410,14 +308,32 @@ const MyCourses = () => {
                 <Play className="w-6 h-6 text-white" />
               </div>
               <h3 className="font-semibold text-foreground mb-2">
-                Join Live Class
+                {quickActions?.liveClass?.isLive ? "Live Now!" : "Next Live Class"}
               </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Database Systems starts in 30 mins
+              <p className={`text-sm mb-4 ${quickActions?.liveClass?.isLive ? 'text-red-500 font-bold' : 'text-muted-foreground'}`}>
+                {quickActions?.liveClass ? (
+                  <>
+                    {quickActions.liveClass.title}
+                    <br />
+                    <span className="text-xs font-normal opacity-80">{quickActions.liveClass.time}</span>
+                  </>
+                ) : (
+                  "No upcoming live classes"
+                )}
               </p>
-              <Button variant="outline" className="w-full">
+              <Button
+                variant={quickActions?.liveClass?.isLive ? "default" : "outline"}
+                className={`w-full ${quickActions?.liveClass?.isLive ? 'bg-red-600 hover:bg-red-700' : ''}`}
+                onClick={() => {
+                  if (quickActions?.liveClass?.isLive && quickActions?.liveClass?.link && quickActions.liveClass.link !== "#") {
+                    window.open(quickActions.liveClass.link, '_blank');
+                  } else {
+                    navigate('/class-schedule');
+                  }
+                }}
+              >
                 <Video className="w-4 h-4 mr-2" />
-                Join Now
+                {quickActions?.liveClass?.isLive ? "Join Now" : "View Schedule"}
               </Button>
             </CardContent>
           </Card>
@@ -428,7 +344,7 @@ const MyCourses = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          <Card className="glass-effect border-0 shadow-card hover:shadow-elegant transition-all cursor-pointer hover-lift">
+          <Card className="glass-effect border-0 shadow-card hover:shadow-elegant transition-all cursor-pointer hover-lift" onClick={() => navigate('/student/assignments?tab=pending')}>
             <CardContent className="p-6 text-center">
               <div className="bg-gradient-secondary p-3 rounded-full w-fit mx-auto mb-4">
                 <FileText className="w-6 h-6 text-white" />
@@ -437,10 +353,10 @@ const MyCourses = () => {
                 Submit Assignment
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                3 assignments pending submission
+                {quickActions?.assignmentsPending || 0} assignments pending submission
               </p>
-              <Button variant="outline" className="w-full">
-                <Upload className="w-4 h-4 mr-2" />
+              <Button variant="outline" className="w-full" onClick={(e) => { e.stopPropagation(); navigate('/student/assignments?tab=pending'); }}>
+                <UploadIcon className="w-4 h-4 mr-2" />
                 Upload Work
               </Button>
             </CardContent>
@@ -452,7 +368,7 @@ const MyCourses = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6 }}
         >
-          <Card className="glass-effect border-0 shadow-card hover:shadow-elegant transition-all cursor-pointer hover-lift">
+          <Card className="glass-effect border-0 shadow-card hover:shadow-elegant transition-all cursor-pointer hover-lift" onClick={() => navigate('/academic-goals')}>
             <CardContent className="p-6 text-center">
               <div className="bg-gradient-hero p-3 rounded-full w-fit mx-auto mb-4">
                 <Target className="w-6 h-6 text-white" />
@@ -461,9 +377,9 @@ const MyCourses = () => {
                 Academic Goals
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Track your semester targets
+                {quickActions?.activeGoals || 0} active targets
               </p>
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={(e) => { e.stopPropagation(); navigate('/academic-goals'); }}>
                 <Award className="w-4 h-4 mr-2" />
                 View Goals
               </Button>

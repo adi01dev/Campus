@@ -7,6 +7,8 @@ export interface ISubmission {
   linkUrl?: string;
   fileUrl?: string;
   submittedAt: Date;
+  grade?: number;
+  feedback?: string;
 }
 
 export interface IAssignment extends Document {
@@ -28,6 +30,8 @@ const submissionSchema = new Schema<ISubmission>({
   linkUrl: String,
   fileUrl: String,
   submittedAt: { type: Date, default: Date.now },
+  grade: Number,
+  feedback: String
 });
 
 const assignmentSchema = new Schema<IAssignment>(

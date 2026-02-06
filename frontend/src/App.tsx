@@ -49,6 +49,7 @@ import FinancialReports from "./pages/FinancialReports";
 import PaymentReminders from "./pages/PaymentReminders";
 import Assignments from "./pages/Assignments";
 import FacultySchedule from "./pages/FacultySchedule";
+import AcademicGoals from "./pages/AcademicGoals";
 import Help from "./pages/Help";
 import ProtectedRoute from "./routes/ProtectedRoute";
 
@@ -67,8 +68,8 @@ const App = () => (
           <Route path="/dashboard/*" element={<AppLayout />}>
             <Route path="faculty" element={<FacultyDashboard />} />
             <Route path="student" element={<StudentDashboard />} />
-            <Route path="admin" element={<AdminDashboard />} 
-             />
+            <Route path="admin" element={<AdminDashboard />}
+            />
           </Route>
 
           <Route element={<AppLayout />}>
@@ -98,8 +99,9 @@ const App = () => (
             <Route path="/institute-settings" element={<InstituteSettings />} />
             <Route path="/academic-performance" element={<AcademicPerformance />} />
             <Route path="/academic-calendar" element={<AcademicCalendar />} />
-            
-            <Route path="/student-assignments" element={<StudentAssignments />} />
+            <Route path="/academic-goals" element={<AcademicGoals />} />
+
+            <Route path="/student/assignments" element={<StudentAssignments />} />
             <Route path="/user-records" element={<UserRecords />} />
             <Route path="/system-management" element={<SystemManagement />} />
             <Route path="/admin-notifications" element={<AdminNotifications />} />

@@ -6,8 +6,11 @@ export interface IMaterial extends Document {
   description?: string;
   fileUrl: string;
   fileType: string;
+  fileSize: number;
   uploadedBy: string;
   uploadedAt: Date;
+  downloads: number;
+  views: number;
 }
 
 const MaterialSchema = new Schema<IMaterial>({
@@ -16,8 +19,11 @@ const MaterialSchema = new Schema<IMaterial>({
   description: { type: String },
   fileUrl: { type: String, required: true },
   fileType: { type: String, required: true },
+  fileSize: { type: Number, required: true }, // Size in bytes
   uploadedBy: { type: String, required: true },
   uploadedAt: { type: Date, default: Date.now },
+  downloads: { type: Number, default: 0 },
+  views: { type: Number, default: 0 },
 });
 
 export default mongoose.model<IMaterial>("Material", MaterialSchema);
