@@ -7,25 +7,46 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Target, Plus, Trash2, Calendar, TrendingUp, CheckCircle2, Clock } from 'lucide-react';
+import { Target, Plus, Trash2, Calendar, TrendingUp, CheckCircle2, Clock, Edit2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
 const AcademicGoals = () => {
     const [goals, setGoals] = useState<any[]>([]);
+    const [stats, setStats] = useState<any>({ active: 0, completed: 0, daysToNextDeadline: 0, nextDeadlineLabel: "No upcoming deadlines" });
     const [newGoal, setNewGoal] = useState({ title: '', targetValue: 100, deadline: '' });
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    // Update State
+    const [isUpdateOpen, setIsUpdateOpen] = useState(false);
+    const [selectedGoal, setSelectedGoal] = useState<any>(null);
+    const [updateData, setUpdateData] = useState({ currentValue: 0, status: 'In Progress' });
+
     const { toast } = useToast();
     const token = localStorage.getItem('accessToken');
 
     const fetchGoals = async () => {
         try {
-            const res = await fetch(`${API_BASE}/dashboard/goals`, {
+            const res = await fetch(`${API_BASE}/goals`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
+            if (res.status === 401) {
+                localStorage.removeItem('accessToken');
+                window.location.href = '/login';
+                return;
+            }
+
             if (res.ok) setGoals(await res.json());
+
+            const statsRes = await fetch(`${API_BASE}/goals/stats`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (statsRes.ok) setStats(await statsRes.json());
+
         } catch (err) {
             console.error("Failed to fetch goals", err);
         }
@@ -42,7 +63,7 @@ const AcademicGoals = () => {
         }
 
         try {
-            const res = await fetch(`${API_BASE}/dashboard/goals`, {
+            const res = await fetch(`${API_BASE}/goals`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -51,26 +72,67 @@ const AcademicGoals = () => {
                 body: JSON.stringify(newGoal)
             });
 
+            if (res.status === 401) {
+                localStorage.removeItem('accessToken');
+                window.location.href = '/login';
+                return;
+            }
+
+            const data = await res.json();
+
             if (res.ok) {
                 toast({ title: "Goal Created", description: "Your new target has been set!" });
                 setIsDialogOpen(false);
                 setNewGoal({ title: '', targetValue: 100, deadline: '' });
                 fetchGoals();
+            } else {
+                console.error("Goal creation failed:", data);
+                toast({ title: "Error", description: data.message || "Failed to create goal", variant: "destructive" });
             }
         } catch (err) {
+            console.error(err);
             toast({ title: "Error", description: "Failed to create goal", variant: "destructive" });
         }
     };
 
+    const handleUpdateGoal = async () => {
+        if (!selectedGoal) return;
+        try {
+            const res = await fetch(`${API_BASE}/goals/${selectedGoal._id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(updateData)
+            });
+
+            if (res.ok) {
+                toast({ title: "Goal Updated", description: "Progress saved successfully!" });
+                setIsUpdateOpen(false);
+                fetchGoals();
+            }
+        } catch (err) {
+            toast({ title: "Error", description: "Failed to update goal", variant: "destructive" });
+        }
+    }
+
+    const openUpdateModal = (goal: any) => {
+        setSelectedGoal(goal);
+        setUpdateData({ currentValue: goal.currentValue || 0, status: goal.status || 'In Progress' });
+        setIsUpdateOpen(true);
+    }
+
     const deleteGoal = async (id: string) => {
         try {
-            const res = await fetch(`${API_BASE}/dashboard/goals/${id}`, {
+            const res = await fetch(`${API_BASE}/goals/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (res.ok) {
                 setGoals(prev => prev.filter(g => g._id !== id));
+                fetchGoals(); // Refresh stats
                 toast({ title: "Goal Removed", description: "Target deleted successfully" });
             } else {
                 toast({ title: "Error", description: "Failed to delete goal", variant: "destructive" });
@@ -90,6 +152,7 @@ const AcademicGoals = () => {
         >
             <BreadcrumbNav />
 
+            {/* Header & Add Button */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
@@ -140,13 +203,14 @@ const AcademicGoals = () => {
                 </Dialog>
             </div>
 
+            {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="glass-card border-l-4 border-blue-500">
                     <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Active Targets</p>
-                                <p className="text-3xl font-black">{goals.length}</p>
+                                <p className="text-3xl font-black">{stats.active}</p>
                             </div>
                             <Target className="w-10 h-10 text-blue-500/20" />
                         </div>
@@ -157,7 +221,7 @@ const AcademicGoals = () => {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Completed</p>
-                                <p className="text-3xl font-black">0</p>
+                                <p className="text-3xl font-black">{stats.completed}</p>
                             </div>
                             <CheckCircle2 className="w-10 h-10 text-green-500/20" />
                         </div>
@@ -167,8 +231,9 @@ const AcademicGoals = () => {
                     <CardContent className="pt-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Days to Finals</p>
-                                <p className="text-3xl font-black">45</p>
+                                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Days to Deadline</p>
+                                <p className="text-3xl font-black">{stats.daysToNextDeadline}</p>
+                                <p className="text-[10px] text-muted-foreground truncate max-w-[120px]">{stats.nextDeadlineLabel}</p>
                             </div>
                             <Clock className="w-10 h-10 text-orange-500/20" />
                         </div>
@@ -176,6 +241,7 @@ const AcademicGoals = () => {
                 </Card>
             </div>
 
+            {/* Goals List */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {goals.length === 0 ? (
                     <Card className="lg:col-span-2 py-20 bg-muted/5 border-dashed border-2">
@@ -192,15 +258,13 @@ const AcademicGoals = () => {
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: index * 0.1 }}
                     >
-                        <Card className="group relative overflow-hidden glass-card hover:shadow-elegant transition-all duration-500">
-                            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button variant="ghost" size="icon" onClick={() => deleteGoal(goal._id)} className="text-destructive hover:bg-destructive/10">
-                                    <Trash2 className="w-4 h-4" />
-                                </Button>
-                            </div>
+                        <Card className={`group relative overflow-hidden glass-card hover:shadow-elegant transition-all duration-500 ${goal.status === 'Completed' ? 'border-green-500/50 bg-green-500/5' : ''}`}>
+
                             <CardHeader>
                                 <div className="flex items-center justify-between mb-2">
-                                    <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-primary/20 bg-primary/5">Academic</Badge>
+                                    <Badge variant={goal.status === 'Completed' ? "default" : "outline"} className={`text-[10px] font-black uppercase tracking-widest ${goal.status === 'Completed' ? 'bg-green-500' : 'border-primary/20 bg-primary/5'}`}>
+                                        {goal.status || 'Active'}
+                                    </Badge>
                                     <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
                                         <Calendar className="w-3 h-3" />
                                         {new Date(goal.deadline).toLocaleDateString()}
@@ -214,19 +278,65 @@ const AcademicGoals = () => {
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
                                         <span className="font-bold text-muted-foreground uppercase tracking-tighter">Progress</span>
-                                        <span className="font-black text-primary">{goal.currentValue || 0}% / {goal.targetValue}%</span>
+                                        <span className="font-black text-primary">{goal.currentValue || 0} / {goal.targetValue}</span>
                                     </div>
-                                    <Progress value={((goal.currentValue || 0) / goal.targetValue) * 100} className="h-2.5 shadow-inner" />
+                                    <Progress value={((goal.currentValue || 0) / goal.targetValue) * 100} className={`h-2.5 shadow-inner ${goal.status === 'Completed' ? 'bg-green-200' : ''}`} />
                                 </div>
-                                <div className="pt-4 flex items-center justify-between border-t border-border/5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                                    <span>Status: {goal.status || 'In Progress'}</span>
-                                    <div className="h-1.5 w-12 bg-primary/20 rounded-full group-hover:w-20 transition-all duration-700"></div>
+                                <div className="pt-4 flex items-center justify-between border-t border-border/5">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status: {goal.status || 'In Progress'}</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openUpdateModal(goal); }} className="h-6 w-6 text-blue-500 hover:bg-blue-500/10">
+                                            <Edit2 className="w-3 h-3" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteGoal(goal._id); }} className="h-6 w-6 text-destructive hover:bg-destructive/10">
+                                            <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
                     </motion.div>
                 ))}
             </div>
+
+            {/* Update Dialog */}
+            <Dialog open={isUpdateOpen} onOpenChange={setIsUpdateOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Update Progress: {selectedGoal?.title}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label>Current Value (Target: {selectedGoal?.targetValue})</Label>
+                            <Input
+                                type="number"
+                                value={updateData.currentValue}
+                                onChange={(e) => setUpdateData({ ...updateData, currentValue: parseInt(e.target.value) })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Status</Label>
+                            <Select
+                                value={updateData.status}
+                                onValueChange={(value) => setUpdateData({ ...updateData, status: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="In Progress">In Progress</SelectItem>
+                                    <SelectItem value="Completed">Completed</SelectItem>
+                                    <SelectItem value="Missed">Missed</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Button className="w-full" onClick={handleUpdateGoal}>Save Progress</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
         </motion.div>
     );
 };

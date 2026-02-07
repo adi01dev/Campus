@@ -78,12 +78,21 @@ const StudentDashboard = () => {
 
       if (!response.ok) throw new Error("Download failed");
 
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let downloadFilename = filename;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          downloadFilename = filenameMatch[1];
+        }
+      }
+
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
 
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.setAttribute('download', filename);
+      link.setAttribute('download', downloadFilename);
       document.body.appendChild(link);
       link.click();
 
@@ -94,7 +103,7 @@ const StudentDashboard = () => {
         item._id === id ? { ...item, downloads: (item.downloads || 0) + 1 } : item
       ));
 
-      toast({ title: "Success", description: "Download started" });
+      toast({ title: "Success", description: "Download started successfully" });
     } catch (err) {
       console.error("Download error", err);
       toast({ title: "Error", description: "Failed to download file", variant: "destructive" });
@@ -137,7 +146,6 @@ const StudentDashboard = () => {
     { label: 'Overall Attendance', value: stats.overallAttendance || '0%', change: 'Current', icon: Calendar, color: 'text-blue-500' },
     { label: 'Pending Assignments', value: stats.assignmentsPending?.toString() || '0', change: 'Due Soon', icon: FileText, color: 'text-orange-500' },
     { label: 'Classes Today', value: stats.classesToday?.toString() || schedule.length.toString(), change: 'On Time', icon: Clock, color: 'text-green-500' },
-    { label: 'Enrolled Courses', value: stats.enrolledCourses?.toString() || '0', change: 'Active', icon: BookOpen, color: 'text-purple-500' },
   ];
 
   const todaysSchedule = schedule.map((item: any) => ({
@@ -147,11 +155,6 @@ const StudentDashboard = () => {
     type: item.type
   }));
 
-  // Filter for pending assignments and map to UI format
-  // Assuming assignments have a 'status' or we just show recent ones.
-  // Ideally, backend filters this, but we'll map the raw list here.
-  // Filter for pending assignments and map to UI format
-  // Ideally, backend filters this, but we'll map the raw list here.
   const recentAssignments = assignmentData.slice(0, 3).map((a: any) => ({
     title: a.title,
     subject: a.subject,
@@ -279,16 +282,16 @@ const StudentDashboard = () => {
           <div className="flex-1">
             <h1 className="text-4xl font-bold mb-3 tracking-tight">Welcome Back, {user?.name || 'Student'}</h1>
             <p className="text-white/80 text-lg max-w-2xl leading-relaxed">
-              Continue your academic journey. You have <span className="font-bold text-white underline decoration-secondary decoration-2 underline-offset-4">{assignmentData.length || stats.assignmentsPending || 0} assignments</span> waiting for your attention.
+              Continue your academic journey. You have <span className="font-bold text-white underline decoration-secondary decoration-2 underline-offset-4">{stats.assignmentsPending || 0} {stats.assignmentsPending === 1 ? 'assignment' : 'assignments'}</span> waiting for your attention.
             </p>
             <div className="flex flex-wrap items-center gap-6 mt-6">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
                 <GraduationCap className="w-5 h-5 text-secondary" />
-                <span className="text-sm font-medium">Computer Science Engineering</span>
+                <span className="text-sm font-medium">{user?.department || 'Department'}</span>
               </div>
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
                 <Target className="w-5 h-5 text-secondary" />
-                <span className="text-sm font-medium">Semester 6</span>
+                <span className="text-sm font-medium">{user?.semester ? `Semester ${user.semester}` : 'Semester'}</span>
               </div>
             </div>
           </div>
@@ -303,7 +306,7 @@ const StudentDashboard = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {quickStats.map((stat, index) => (
           <Card key={index} className="glass-effect border-0 shadow-card hover-lift hover-border overflow-hidden">
             <CardContent className="p-6 relative group">
@@ -372,7 +375,7 @@ const StudentDashboard = () => {
                 <FileText className="w-5 h-5" />
                 Assignment Tracker
               </CardTitle>
-              <Link to="/assignments">
+              <Link to="/student/assignments">
                 <Button variant="ghost" size="sm" className="hover:bg-primary hover:text-white transition-colors">
                   View All
                 </Button>

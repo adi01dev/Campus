@@ -145,12 +145,21 @@ const UploadMaterials = () => {
         throw new Error(errData.message || "Download failed");
       }
 
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let downloadFilename = filename;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          downloadFilename = filenameMatch[1];
+        }
+      }
+
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
 
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.setAttribute('download', filename);
+      link.setAttribute('download', downloadFilename);
       document.body.appendChild(link);
       link.click();
 
@@ -164,7 +173,7 @@ const UploadMaterials = () => {
       ));
       fetchStats();
 
-      toast({ title: "Success", description: "Download started" });
+      toast({ title: "Success", description: "Download started successfully" });
     } catch (err) {
       console.error("Download error", err);
       toast({ title: "Error", description: "Failed to download file", variant: "destructive" });
@@ -174,6 +183,30 @@ const UploadMaterials = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this material?")) return;
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`${API_BASE_URL}/materials/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        toast({ title: "Success", description: "Material deleted successfully" });
+        setUploads(prev => prev.filter(item => item.id !== id));
+        fetchStats();
+      } else {
+        const err = await res.json();
+        toast({ title: "Error", description: err.message || "Failed to delete", variant: "destructive" });
+      }
+    } catch (err) {
+      console.error("Delete error", err);
+      toast({ title: "Error", description: "Failed to delete material", variant: "destructive" });
     }
   };
 
@@ -200,7 +233,7 @@ const UploadMaterials = () => {
       });
 
       if (res.ok) {
-        alert("Material uploaded successfully!");
+        toast({ title: "Success", description: "Material uploaded successfully!" });
         setFile(null);
         setTitle('');
         setDescription('');
@@ -208,11 +241,11 @@ const UploadMaterials = () => {
         fetchStats(); // Refresh stats
       } else {
         const err = await res.json();
-        alert(`Upload failed: ${err.message}`);
+        toast({ title: "Error", description: `Upload failed: ${err.message}`, variant: "destructive" });
       }
     } catch (err) {
       console.error("Upload error", err);
-      alert("Upload failed. See console.");
+      toast({ title: "Error", description: "Upload failed. Please try again.", variant: "destructive" });
     }
   };
 
@@ -387,7 +420,15 @@ const UploadMaterials = () => {
                             <Download className="w-5 h-5" />
                           </Button>
                           {userRole && userRole !== 'Student' && (
-                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-destructive/5 hover:bg-destructive hover:text-white transition-all shadow-sm">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-10 w-10 rounded-xl bg-destructive/5 hover:bg-destructive hover:text-white transition-all shadow-sm relative z-20"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDelete(file.id);
+                              }}
+                            >
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           )}
@@ -423,7 +464,7 @@ const UploadMaterials = () => {
                       <span className="flex items-center gap-1 opacity-70">
                         <ChevronRight className="w-3 h-3" /> Uploaded by {file.uploadedBy}
                       </span>
-                      <div className="h-1 w-12 bg-primary/20 rounded-full group-hover:w-20 transition-all duration-700"></div>
+                      <div className="h-1 w-12 bg-blue-500/20 rounded-full group-hover:w-20 transition-all duration-700"></div>
                     </div>
                   </motion.div>
                 ))}

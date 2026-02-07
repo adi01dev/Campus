@@ -20,6 +20,9 @@ export interface IAssignment extends Document {
   dueDate: string;
   totalMarks: number;
   instructions?: string;
+  fileUrl?: string; // ✅ Optional attachment by faculty
+  fileType?: string;
+  fileName?: string;
   submissions: ISubmission[];
 }
 
@@ -44,6 +47,9 @@ const assignmentSchema = new Schema<IAssignment>(
     dueDate: { type: String, required: true },
     totalMarks: { type: Number, required: true },
     instructions: String,
+    fileUrl: String,
+    fileType: String,
+    fileName: String,
     submissions: [submissionSchema],
   },
   { timestamps: true }

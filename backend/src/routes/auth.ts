@@ -14,28 +14,12 @@ import Activity from '../models/Activity'; // Import Activity model
 const router = Router();
 const SALT_ROUNDS = 10;
 
-// Configure Multer for Profile Images
-const uploadDir = path.join(process.cwd(), 'uploads', 'profiles');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+import { createUploader } from '../middlewares/upload';
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => cb(null, `${Date.now()}-${uuidv4()}${path.extname(file.originalname)}`)
-});
+// ... (keep imports)
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (_req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|avif|afif|jfif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    if (extname && mimetype) {
-      return cb(null, true);
-    }
-    cb(new Error('Only images are allowed'));
-  }
-});
+// Initialize GridFS Uploader
+const upload = createUploader("profiles");
 
 /**
  * POST /api/auth/profile-image
@@ -45,7 +29,8 @@ router.post('/profile-image', authenticate, upload.single('image'), async (req: 
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-    const imageUrl = `/uploads/profiles/${req.file.filename}`;
+    // GridFS URL
+    const imageUrl = `/api/users/profile-image/${req.file.filename}`;
 
     const user = await User.findByIdAndUpdate(
       req.user.id,

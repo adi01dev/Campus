@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
 import Material from "../models/Material";
@@ -8,6 +9,13 @@ import { authenticate, AuthRequest } from "../middlewares/auth";
 const router = express.Router();
 const uploader = createUploader("materials");
 
+// Helper to get GridFS Bucket
+const getBucket = () => {
+  return new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+    bucketName: "uploads"
+  });
+};
+
 // Post new material (Faculty only, but checking auth generally here)
 router.post("/upload", authenticate, uploader.single("file"), async (req: AuthRequest, res: Response) => {
   try {
@@ -15,7 +23,9 @@ router.post("/upload", authenticate, uploader.single("file"), async (req: AuthRe
 
     if (!req.file) return res.status(400).json({ message: "File required" });
 
-    const fileUrl = `/uploads/materials/${req.file.filename}`;
+    // GridFS returns file details in req.file
+    // We construct a URL that points to our streaming endpoint
+    const fileUrl = `/api/materials/files/${req.file.filename}`;
     const fileType = (req.file.mimetype || "").split("/")[1] || "file";
     const fileSize = req.file.size; // Get file size from multer
 
@@ -96,6 +106,75 @@ router.post("/:id/download", authenticate, async (req: Request, res: Response) =
   }
 });
 
+// 📂 Serve Files (Stream from GridFS)
+router.get("/files/:filename", async (req: Request, res: Response) => {
+  try {
+    const bucket = getBucket();
+    const filename = req.params.filename;
+
+    // Determine content type based on extension
+    const ext = path.extname(filename).toLowerCase();
+    let contentType = "application/octet-stream";
+
+    if (ext === ".pdf") contentType = "application/pdf";
+    else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+    else if (ext === ".png") contentType = "image/png";
+    else if (ext === ".mp4") contentType = "video/mp4";
+
+    const downloadStream = bucket.openDownloadStreamByName(filename);
+
+    // Set header so browser knows how to display it
+    res.set("Content-Type", contentType);
+
+    downloadStream.on("data", (chunk) => {
+      res.write(chunk);
+    });
+
+    downloadStream.on("error", (err) => {
+      // console.error("Stream error:", err);
+      res.status(404).json({ message: "File not found" });
+    });
+
+    downloadStream.on("end", () => {
+      res.end();
+    });
+  } catch (error) {
+    console.error("File retrieval error:", error);
+    res.status(500).json({ message: "Error retrieving file" });
+  }
+});
+
+// 🗑️ Delete Material
+router.delete("/:id", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const material = await Material.findById(req.params.id);
+    if (!material) return res.status(404).json({ message: "Material not found" });
+
+    // Optional: Check if user is the uploader or admin
+    // if (material.uploadedBy !== req.user.name && req.user.role !== 'Admin') {
+    //   return res.status(403).json({ message: "Unauthorized" });
+    // }
+
+    // Delete file from GridFS
+    if (material.fileUrl && material.fileUrl.includes("/files/")) {
+      const filename = path.basename(material.fileUrl);
+      const bucket = getBucket();
+      // We need file _id to delete from bucket, or we can use deleteByName if supported (it's not directly)
+      // Standard GridFS delete requires _id. 
+      // We can find the file by filename first.
+      const files = await bucket.find({ filename }).toArray();
+      if (files.length > 0) {
+        await bucket.delete(files[0]._id);
+      }
+    }
+
+    await material.deleteOne();
+    res.json({ message: "Material deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: (err as Error).message });
+  }
+});
+
 // Robust File Download (GET) - Serves the actual file
 router.get("/:id/download", authenticate, async (req: Request, res: Response) => {
   try {
@@ -113,34 +192,39 @@ router.get("/:id/download", authenticate, async (req: Request, res: Response) =>
       return res.status(404).json({ message: "Material record not found in database" });
     }
 
-    // 2. Resolve absolute path robustly
-    const relativePath = material.fileUrl.startsWith('/') ? material.fileUrl.substring(1) : material.fileUrl;
-    const filePath = path.resolve(process.cwd(), relativePath);
+    const fileUrl = material.fileUrl;
+    let filename = path.basename(fileUrl);
 
-    console.log(`Download request for: ${material.title}`);
-    console.log(`Resolved Path: ${filePath}`);
+    // Attempt GridFS stream
+    const bucket = getBucket();
+    const downloadStream = bucket.openDownloadStreamByName(filename);
 
-    // 3. Check physical file existence
-    if (!fs.existsSync(filePath)) {
-      console.error(`Physical file missing: ${filePath}`);
-      return res.status(404).json({ message: "The requested file is missing from the server storage" });
+    // Sanitize download name
+    let ext = path.extname(filename);
+    if (!ext || ext === '.') {
+      ext = `.${material.fileType}`;
     }
-
-    // 4. Sanitize download name
-    const ext = path.extname(filePath);
     const downloadName = `${material.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}${ext}`;
 
-    // 5. Stream download
-    res.download(filePath, downloadName, (err) => {
-      if (err) {
-        console.error("Error streaming file:", err);
-        // If headers weren't sent yet, we can send a 500. 
-        // If they WERE sent, the connection is already broken and handled by Express.
-        if (!res.headersSent) {
-          res.status(500).json({ message: "Failed to initialize file transfer", error: err.message });
+    res.set('Content-Disposition', `attachment; filename="${downloadName}"`);
+    res.set('Access-Control-Expose-Headers', 'Content-Disposition');
+
+    downloadStream.pipe(res)
+      .on('error', (err) => {
+        // Fallback to local file system for legacy files
+        // If the fileUrl maps to a local path (starts with /uploads/materials/) relative to cwd
+        const relativePath = material.fileUrl.startsWith('/') ? material.fileUrl.substring(1) : material.fileUrl;
+        const filePath = path.resolve(process.cwd(), relativePath);
+
+        console.error(`GridFS error for ${filename}, trying local: ${filePath}`);
+
+        if (fs.existsSync(filePath)) {
+          res.download(filePath, downloadName);
+        } else {
+          res.status(404).json({ message: "The requested file is missing from the server storage" });
         }
-      }
-    });
+      });
+
   } catch (err: any) {
     console.error("Download route exception:", err);
     res.status(500).json({

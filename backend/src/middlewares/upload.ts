@@ -1,20 +1,24 @@
-import multer, { StorageEngine } from "multer";
-import path from "path";
-import fs from "fs";
+import multer from "multer";
+import { GridFsStorage } from "multer-gridfs-storage";
+import { MONGODB_URI } from "../config";
 
-function ensureDir(dir: string) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-}
+// Create storage engine
+const storage = new GridFsStorage({
+  url: MONGODB_URI,
+  file: (_req, file) => {
+    return new Promise((resolve, reject) => {
+      const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
+      const fileInfo = {
+        filename: filename,
+        bucketName: "uploads" // Collection name: uploads.files, uploads.chunks
+      };
+      resolve(fileInfo);
+    });
+  }
+});
 
-export const createUploader = (subfolder: string) => {
-  const uploadDir = path.join(process.cwd(), "uploads", subfolder);
-  ensureDir(uploadDir);
-
-  const storage: StorageEngine = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) =>
-      cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`),
-  });
-
+export const createUploader = (_subfolder: string) => {
+  // subfolder arg is kept for compatibility but ignored in GridFS as we use buckets/metadata
+  // You can use metadata to store subfolder info if needed
   return multer({ storage });
 };

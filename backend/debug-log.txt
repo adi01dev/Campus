@@ -1,0 +1,29 @@
+Error: MongooseError: The `uri` parameter to `openUri()` must be a string, got "undefined". Make sure the first parameter to `mongoose.connect()` or `mongoose.createConnection()` is a string.
+"Connected to DB"
+{
+  "facultyDepts": [
+    "CSE"
+  ]
+}
+{
+  "studentDepts": [
+    "CSE"
+  ]
+}
+{
+  "faculty": [
+    {
+      "_id": "6984b75a68c23866e0f0b603",
+      "name": "amit",
+      "email": "amit@gmail.com",
+      "department": "CSE"
+    }
+  ]
+}
+"Connected to DB"
+{
+  "countCSE": 2
+}
+{
+  "totalStudents": 2
+}

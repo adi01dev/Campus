@@ -41,9 +41,10 @@ interface User {
 
 interface SidebarProps {
   user: User;
+  stats?: any;
 }
 
-export const Sidebar = ({ user }: SidebarProps) => {
+export const Sidebar = ({ user, stats }: SidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -102,11 +103,11 @@ export const Sidebar = ({ user }: SidebarProps) => {
         { icon: UserCheck, label: 'My Attendance', path: '/my-attendance', badge: null },
         {
           icon: FileText, label: 'Assignments', path: "/student/assignments",
-          badge: '3 Due'
+          badge: stats?.assignmentsPending ? `${stats.assignmentsPending} Due` : null
         },
-        { icon: CreditCard, label: 'Fee Payment', path: '/fee-payment', badge: 'Due' },
+        { icon: CreditCard, label: 'Fee Payment', path: '/fee-payment', badge: stats?.feeStatus === 'Due' ? 'Due' : null },
         { icon: MessageSquare, label: 'MoU Requests', path: '/mou-requests', badge: null },
-        { icon: Brain, label: 'AI Recommendations', path: '/ai-recommendations', badge: 'New' },
+        { icon: Brain, label: 'AI Recommendations', path: '/ai-recommendations', badge: stats?.aiNew ? 'New' : null },
       ],
       'Admin': [
         { icon: Upload, label: 'Document Management', path: '/document-management', badge: null },

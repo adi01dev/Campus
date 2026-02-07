@@ -17,6 +17,7 @@
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.0",
     "multer": "^2.0.2",
+    "multer-gridfs-storage": "^5.0.2",
     "nodemailer": "^7.0.10",
     "uuid": "^9.0.0"
   },

@@ -7,6 +7,8 @@ export interface AuthRequest extends Request {
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
+  // console.log("Auth Header:", authHeader); // Debug log
+
   if (!authHeader) return res.status(401).json({ message: 'Missing Authorization header' });
 
   const parts = authHeader.split(' ');
@@ -15,9 +17,11 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   const token = parts[1];
   try {
     const payload = verifyAccessToken(token) as any;
+    // console.log("Token Payload:", payload); // Debug log
     req.user = payload;
     next();
   } catch (err) {
+    console.error("Token verification failed:", err);
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
 };

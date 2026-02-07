@@ -19,9 +19,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [stats, setStats] = useState<any>({});
 
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
   // ✅ Combined Auth + User load logic
   useEffect(() => {
@@ -36,6 +39,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     try {
       const parsedUser = JSON.parse(userStr);
       setUser(parsedUser);
+      fetchStats(token); // Fetch stats on load
     } catch {
       localStorage.removeItem('user');
       navigate('/login', { replace: true });
@@ -44,6 +48,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       const updatedUserStr = localStorage.getItem('user');
       if (updatedUserStr) {
         setUser(JSON.parse(updatedUserStr));
+        fetchStats(token);
       }
     };
 
@@ -53,6 +58,20 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       window.removeEventListener('user-updated', handleUserUpdate);
     };
   }, [navigate]);
+
+  const fetchStats = async (token: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/dashboard/stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch layout stats", err);
+    }
+  };
 
   // 🌀 Optional loading screen before redirect or layout load
   if (!user) {
@@ -81,18 +100,18 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-80">
-          <Sidebar user={user} />
+          <Sidebar user={user} stats={stats} />
         </SheetContent>
       </Sheet>
 
       {/* Desktop Layout */}
       <div className="lg:flex">
         <div className="hidden lg:block w-80 fixed inset-y-0 z-30">
-          <Sidebar user={user} />
+          <Sidebar user={user} stats={stats} />
         </div>
 
         <div className="lg:ml-80 flex-1">
-          <Header user={user} />
+          <Header user={user} stats={stats} />
 
           {/* Quick Action Bar */}
           <div className="sticky top-16 z-20 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-2">
@@ -112,9 +131,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                   className="relative hover:bg-primary/10"
                 >
                   <Bell className="w-4 h-4" />
-                  <Badge variant="destructive" className="absolute -top-1 -right-1 w-5 h-5 text-xs p-0 flex items-center justify-center">
-                    3
-                  </Badge>
+                  {stats.notificationsCount > 0 && (
+                    <Badge variant="destructive" className="absolute -top-1 -right-1 w-5 h-5 text-xs p-0 flex items-center justify-center">
+                      {stats.notificationsCount}
+                    </Badge>
+                  )}
                 </Button>
 
                 <Button
@@ -124,9 +145,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                   className="relative hover:bg-primary/10"
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <Badge variant="secondary" className="absolute -top-1 -right-1 w-5 h-5 text-xs p-0 flex items-center justify-center">
-                    2
-                  </Badge>
+                  {stats.messagesCount > 0 && (
+                    <Badge variant="secondary" className="absolute -top-1 -right-1 w-5 h-5 text-xs p-0 flex items-center justify-center">
+                      {stats.messagesCount}
+                    </Badge>
+                  )}
                 </Button>
               </div>
             </div>

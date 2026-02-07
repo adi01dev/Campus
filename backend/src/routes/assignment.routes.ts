@@ -1,26 +1,34 @@
 import express, { Request, Response } from "express";
-import multer from "multer";
+import mongoose from "mongoose";
 import path from "path";
 import fs from "fs";
 import Assignment from "../models/Assignment";
 import { authenticate, AuthRequest } from "../middlewares/auth";
 import { requireRole } from "../middlewares/requireRole";
 import User from "../models/User";
+import { createUploader } from "../middlewares/upload";
 
 const router = express.Router();
 
-// Create uploads directory
-const uploadDir = path.join(process.cwd(), "uploads", "assignments");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// Initialize GridFS Uploader
+const upload = createUploader("assignments");
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => cb(null, Date.now() + "-" + file.originalname.replace(/\s+/g, "_")),
-});
-const upload = multer({ storage });
+// Interface for GridFS File
+interface GridFSFile extends Express.Multer.File {
+  filename: string;
+  metadata: any;
+  bucketName: string;
+}
+
+// Helper to get GridFS Bucket
+const getBucket = () => {
+  return new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+    bucketName: "uploads"
+  });
+};
 
 // 🎯 Faculty: Create Assignment
-router.post("/", authenticate, requireRole("Faculty"), async (req: AuthRequest, res: Response) => {
+router.post("/", authenticate, requireRole("Faculty"), upload.single("file"), async (req: AuthRequest, res: Response) => {
   try {
     const { title, subject, dueDate, totalMarks, instructions } = req.body;
     const { id: facultyId, department } = req.user;
@@ -40,6 +48,14 @@ router.post("/", authenticate, requireRole("Faculty"), async (req: AuthRequest, 
       return res.status(400).json({ message: "Total marks must be a valid number." });
     }
 
+    // 3. Handle File Upload (Optional)
+    let fileUrl, fileType, fileName;
+    if (req.file) {
+      fileUrl = `/api/assignments/files/${req.file.filename}`;
+      fileType = (req.file.mimetype || "").split("/")[1] || "file";
+      fileName = req.file.originalname;
+    }
+
     const newAssignment = await Assignment.create({
       title,
       subject,
@@ -48,6 +64,9 @@ router.post("/", authenticate, requireRole("Faculty"), async (req: AuthRequest, 
       dueDate,
       totalMarks: parsedMarks,
       instructions,
+      fileUrl,
+      fileType,
+      fileName
     });
     res.status(201).json(newAssignment);
   } catch (error: any) {
@@ -88,18 +107,6 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
         let status = "pending";
         if (mySubmission) {
           status = "submitted";
-          // Check if graded (assuming future feature where submission has grade, 
-          // currently assignment marks are global, but usually grade is on submission)
-          // For now, let's assume if there's a huge logic change we'd see it, but based on current model:
-          // The current model puts 'submissions' as a sub-document. 
-          // We likely need to store the grade ON the submission.
-          // IF the updated model (not seen yet? or I missed it) supports it.
-          // Let's assume standard behavior: if mySubmission has a 'grade' field (check model again if needed, assuming implicit flexibility or future add).
-          // Actually, let's check the Assignment model I read earlier..
-          // The Assignment model I read had: submissions: [{ ... }] with NO grade field in ISubmission?
-          // Wait, I need to check the model again.
-          // Re-reading Step 123 output: ISubmission has studentName, studentId, submissionText, linkUrl, fileUrl, submittedAt. NO GRADE.
-          // Realistically, we need to add 'grade' and 'feedback' to ISubmission in the schema.
         } else if (new Date(assignment.dueDate) < new Date()) {
           status = "overdue";
         }
@@ -160,9 +167,9 @@ router.post("/:id/submit", authenticate, requireRole("Student"), upload.single("
     const assignment = await Assignment.findById(req.params.id);
     if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
-    const fileUrl = req.file ? `/uploads/assignments/${req.file.filename}` : undefined;
-
-    // Check if already submitted? (Optional, skipping for now to allow re-uploads)
+    // Store accessible URL for the file
+    // For GridFS, we use the filename to stream it back
+    const fileUrl = req.file ? `/api/assignments/files/${req.file.filename}` : undefined;
 
     assignment.submissions.push({
       studentName,
@@ -176,6 +183,7 @@ router.post("/:id/submit", authenticate, requireRole("Student"), upload.single("
     await assignment.save();
     res.status(201).json({ message: "Submission successful", assignment });
   } catch (error) {
+    console.error("Error submitting assignment:", error);
     res.status(500).json({ message: "Error submitting assignment", error });
   }
 });
@@ -251,7 +259,45 @@ router.post("/:id/submissions/:studentId/grade", authenticate, requireRole("Facu
   }
 });
 
-// Robust Submission Download (GET)
+// 📂 Serve Files (General Route for Assignments)
+// This route is used to serve files uploaded via GridFS
+// URL format: /api/assignments/files/:filename
+router.get("/files/:filename", async (req: Request, res: Response) => {
+  try {
+    const bucket = getBucket();
+    const filename = req.params.filename;
+
+    // Determine content type based on extension
+    const ext = path.extname(filename).toLowerCase();
+    let contentType = "application/octet-stream";
+
+    if (ext === ".pdf") contentType = "application/pdf";
+    else if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
+    else if (ext === ".png") contentType = "image/png";
+
+    const downloadStream = bucket.openDownloadStreamByName(filename);
+
+    res.set("Content-Type", contentType);
+
+    downloadStream.on("data", (chunk) => {
+      res.write(chunk);
+    });
+
+    downloadStream.on("error", (err) => {
+      console.error("Stream error:", err);
+      res.status(404).json({ message: "File not found" });
+    });
+
+    downloadStream.on("end", () => {
+      res.end();
+    });
+  } catch (error) {
+    console.error("File retrieval error:", error);
+    res.status(500).json({ message: "Error retrieving file" });
+  }
+});
+
+// Robust Submission Download (GET) - Backward compatibility / Specific logic
 router.get("/:id/submissions/:studentId/download", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { id: assignmentId, studentId } = req.params;
@@ -273,28 +319,36 @@ router.get("/:id/submissions/:studentId/download", authenticate, async (req: Aut
       return res.status(404).json({ message: "Submission file not found" });
     }
 
-    // Use robust path joining relative to process.cwd()
-    const relativePath = submission.fileUrl.startsWith('/') ? submission.fileUrl.substring(1) : submission.fileUrl;
-    const filePath = path.join(process.cwd(), relativePath);
+    const fileUrl = submission.fileUrl;
+    let filename = path.basename(fileUrl);
 
-    if (!fs.existsSync(filePath)) {
-      console.error("Submission file not found at path:", filePath);
-      return res.status(404).json({ message: "File not found on server" });
+    // Let's try GridFS first.
+    const bucket = getBucket();
+
+    const downloadStream = bucket.openDownloadStreamByName(filename);
+
+    // Ensure extension is present
+    if (!path.extname(filename)) {
+      // basic inference if missing
+      // This is harder for assignments as we don't store fileType explicitly, 
+      // but often the filename from student upload has it.
+      // If not, it might download without extension.
     }
 
-    const ext = path.extname(filePath);
-    const sanitizedName = (submission.studentName || "Student").replace(/\s+/g, '_');
-    const sanitizedTitle = (assignment.title || "Assignment").replace(/\s+/g, '_');
-    const downloadName = `${sanitizedName}_${sanitizedTitle}${ext}`;
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+    res.set('Access-Control-Expose-Headers', 'Content-Disposition'); // Crucial for frontend to read it
 
-    res.download(filePath, downloadName, (err) => {
-      if (err) {
-        console.error("Error during assignment download:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ message: "Error sending file" });
+    downloadStream.pipe(res)
+      .on('error', (err) => {
+        // Fallback to local file system for legacy files
+        const localPath = path.join(process.cwd(), "uploads", "assignments", filename);
+        if (fs.existsSync(localPath)) {
+          res.download(localPath, filename);
+        } else {
+          res.status(404).json({ message: "File not found" });
         }
-      }
-    });
+      });
+
   } catch (error) {
     console.error("Download route caught error:", error);
     res.status(500).json({ message: "Error downloading submission", error });

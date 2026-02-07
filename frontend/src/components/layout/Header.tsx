@@ -27,9 +27,10 @@ const BACKEND_URL = API_BASE.replace('/api', '');
 
 interface HeaderProps {
   user: User;
+  stats?: any;
 }
 
-export const Header = ({ user }: HeaderProps) => {
+export const Header = ({ user, stats }: HeaderProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
@@ -116,12 +117,12 @@ export const Header = ({ user }: HeaderProps) => {
           <div className="hidden lg:flex items-center gap-4">
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Today's Classes</p>
-              <p className="text-sm font-semibold">6</p>
+              <p className="text-sm font-semibold">{stats?.headerStats?.classesToday || 0}</p>
             </div>
             <div className="w-px h-8 bg-border"></div>
             <div className="text-center">
               <p className="text-xs text-muted-foreground">Pending Tasks</p>
-              <p className="text-sm font-semibold text-warning">3</p>
+              <p className="text-sm font-semibold text-warning">{stats?.headerStats?.pendingTasks || 0}</p>
             </div>
           </div>
 

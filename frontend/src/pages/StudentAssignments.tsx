@@ -162,18 +162,27 @@ const StudentAssignments = () => {
       });
       if (!response.ok) throw new Error("Download failed");
 
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let downloadFilename = 'my_submission.pdf'; // fallback
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          downloadFilename = filenameMatch[1];
+        }
+      }
+
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
 
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.setAttribute('download', 'my_submission.pdf');
+      link.setAttribute('download', downloadFilename);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
 
-      toast({ title: "Success", description: "Download started" });
+      toast({ title: "Success", description: "Download started successfully" });
     } catch (err) {
       console.error(err);
       toast({ title: "Error", description: "Failed to download submission", variant: "destructive" });

@@ -3,12 +3,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Bell, 
-  X, 
-  Calendar, 
-  AlertTriangle, 
-  CheckCircle, 
+import {
+  Bell,
+  X,
+  Calendar,
+  AlertTriangle,
+  CheckCircle,
   Clock,
   BookOpen,
   Users
@@ -31,25 +31,68 @@ interface NotificationPopupProps {
   notifications?: Notification[];
 }
 
-export const NotificationPopup = ({ 
-  isOpen, 
-  onClose, 
-  notifications = defaultNotifications 
+export const NotificationPopup = ({
+  isOpen,
+  onClose
 }: NotificationPopupProps) => {
-  const [localNotifications, setLocalNotifications] = useState(notifications);
+  const [localNotifications, setLocalNotifications] = useState<Notification[]>([]);
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
-  const markAsRead = (id: string) => {
-    setLocalNotifications(prev => 
-      prev.map(notif => 
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    );
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE}/notifications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLocalNotifications(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch notifications", error);
+    }
   };
 
-  const markAllAsRead = () => {
-    setLocalNotifications(prev => 
-      prev.map(notif => ({ ...notif, read: true }))
-    );
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications();
+    }
+  }, [isOpen]);
+
+  const markAsRead = async (id: string) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(`${API_BASE}/notifications/${id}/read`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setLocalNotifications(prev =>
+        prev.map(notif =>
+          notif.id === id ? { ...notif, read: true } : notif
+        )
+      );
+    } catch (error) {
+      console.error("Failed to mark as read", error);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      await fetch(`${API_BASE}/notifications/mark-all-read`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setLocalNotifications(prev =>
+        prev.map(notif => ({ ...notif, read: true }))
+      );
+    } catch (error) {
+      console.error("Failed to mark all as read", error);
+    }
   };
 
   const unreadCount = localNotifications.filter(n => !n.read).length;
@@ -58,11 +101,11 @@ export const NotificationPopup = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end p-4 pt-20">
-      <div 
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm" 
+      <div
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       <Card className="relative w-96 max-h-[80vh] bg-card border shadow-xl animate-slide-in-right">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
@@ -75,12 +118,12 @@ export const NotificationPopup = ({
               </Badge>
             )}
           </div>
-          
+
           <div className="flex items-center gap-2">
             {unreadCount > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={markAllAsRead}
                 className="text-xs"
               >
@@ -117,9 +160,9 @@ export const NotificationPopup = ({
 
         {/* Footer */}
         <div className="p-4 border-t">
-          <Button 
-            variant="outline" 
-            className="w-full" 
+          <Button
+            variant="outline"
+            className="w-full"
             onClick={() => {
               // Navigate to notifications page
               onClose();
@@ -133,16 +176,16 @@ export const NotificationPopup = ({
   );
 };
 
-const NotificationItem = ({ 
-  notification, 
-  onClick 
-}: { 
+const NotificationItem = ({
+  notification,
+  onClick
+}: {
   notification: Notification;
   onClick: () => void;
 }) => {
   const getIcon = () => {
     if (notification.icon) return notification.icon;
-    
+
     switch (notification.type) {
       case 'event':
         return <Calendar className="w-4 h-4 text-primary" />;
@@ -167,7 +210,7 @@ const NotificationItem = ({
         <div className="flex-shrink-0 mt-0.5">
           {getIcon()}
         </div>
-        
+
         <div className="flex-1 space-y-1">
           <div className="flex items-start justify-between">
             <h4 className={cn(
@@ -180,11 +223,11 @@ const NotificationItem = ({
               <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
             )}
           </div>
-          
+
           <p className="text-xs text-muted-foreground">
             {notification.message}
           </p>
-          
+
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="w-3 h-3" />
             {notification.timestamp}
@@ -194,51 +237,3 @@ const NotificationItem = ({
     </div>
   );
 };
-
-const defaultNotifications: Notification[] = [
-  {
-    id: '1',
-    title: 'New Assignment Posted',
-    message: 'Dr. Priya Sharma posted a new assignment for Data Structures',
-    type: 'info',
-    timestamp: '2 minutes ago',
-    read: false,
-    icon: <BookOpen className="w-4 h-4 text-primary" />
-  },
-  {
-    id: '2',
-    title: 'Fee Payment Reminder',
-    message: 'Your semester fee of ₹45,000 is due on 15th January 2024',
-    type: 'warning',
-    timestamp: '1 hour ago',
-    read: false,
-    icon: <AlertTriangle className="w-4 h-4 text-warning" />
-  },
-  {
-    id: '3',
-    title: 'Attendance Updated',
-    message: 'Your attendance has been marked for Computer Networks lecture',
-    type: 'success',
-    timestamp: '3 hours ago',
-    read: true,
-    icon: <CheckCircle className="w-4 h-4 text-success" />
-  },
-  {
-    id: '4',
-    title: 'Parent-Teacher Meeting',
-    message: 'Scheduled for 20th January 2024 at 2:00 PM with Prof. Rajesh Kumar',
-    type: 'event',
-    timestamp: '1 day ago',
-    read: false,
-    icon: <Users className="w-4 h-4 text-primary" />
-  },
-  {
-    id: '5',
-    title: 'Library Book Due',
-    message: 'Return "Advanced Algorithms" by 18th January 2024',
-    type: 'warning',
-    timestamp: '2 days ago',
-    read: true,
-    icon: <BookOpen className="w-4 h-4 text-warning" />
-  }
-];

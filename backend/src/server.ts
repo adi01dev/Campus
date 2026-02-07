@@ -16,6 +16,10 @@ import path from "path";
 import materialRoutes from "./routes/material.routes";
 import assignmentRoutes from "./routes/assignment.routes";
 import dashboardRoutes from "./routes/dashboard";
+import userRoutes from "./routes/user.routes";
+import goalRoutes from "./routes/goals.routes";
+import notificationRoutes from './routes/notifications';
+import messageRoutes from './routes/messages';
 
 dotenv.config();
 const app = express();
@@ -28,7 +32,7 @@ app.use(express.json());
 // ✅ CORS FIX
 app.use(
   cors({
-    origin: ['http://localhost:8080'], // your frontend URL(s)
+    origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000'],
     credentials: true,
   })
 );
@@ -73,6 +77,10 @@ app.get("/", (_req, res) => res.send("CampusConnect Backend Running"));
 
 
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/goals', goalRoutes);
 
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 

@@ -29,6 +29,8 @@ const FacultyDashboard = () => {
   const [user, setUser] = useState<any>(null);
   const [stats, setStats] = useState<any>({});
   const [schedule, setSchedule] = useState<any[]>([]);
+  const [queries, setQueries] = useState<any[]>([]);
+  const [performance, setPerformance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,6 +52,15 @@ const FacultyDashboard = () => {
         const scheduleRes = await fetch(`${API_BASE}/dashboard/schedule`, { headers });
         if (scheduleRes.ok) setSchedule(await scheduleRes.json());
 
+        // 4. Fetch Queries
+        const queriesRes = await fetch(`${API_BASE}/dashboard/queries`, { headers });
+        if (queriesRes.ok) setQueries(await queriesRes.json());
+
+        // 5. Fetch Performance
+        const perfRes = await fetch(`${API_BASE}/dashboard/performance`, { headers });
+        if (perfRes.ok) setPerformance(await perfRes.json());
+
+
       } catch (error) {
         console.error("Dashboard fetch error", error);
       } finally {
@@ -62,27 +73,27 @@ const FacultyDashboard = () => {
   const quickStats = [
     { icon: BookOpen, label: 'Courses Teaching', value: stats.coursesTeaching?.toString() || '0', color: 'text-primary' },
     { icon: Users, label: 'Total Students', value: stats.totalStudents?.toString() || '0', color: 'text-success' },
-    { icon: MessageSquare, label: 'Pending Queries', value: stats.pendingQueries?.toString() || '0', color: 'text-warning' },
-    { icon: FileText, label: 'Assignments to Review', value: stats.assignmentsToReview?.toString() || '0', color: 'text-secondary' },
+    { icon: MessageSquare, label: 'Pending Queries', value: stats.pendingQueries?.toString() || '0', color: 'text-blue-500' },
+    { icon: FileText, label: 'Assignments to Review', value: stats.assignmentsToReview?.toString() || '0', color: 'text-indigo-500' },
   ];
 
   // Static for now, as no Query API endpoint fully integrated in dashboard yet specific for this view
-  const studentQueries = [
-    { student: 'Ansh Dubey', query: 'Clarification on Database Normalization', course: 'DBMS', time: '2 hours ago', urgent: false },
-    { student: 'Ramesh Kumar', query: 'Assignment submission deadline extension', course: 'DSA', time: '4 hours ago', urgent: true },
-  ];
+  // const studentQueries = [
+  //   { student: 'Ansh Dubey', query: 'Clarification on Database Normalization', course: 'DBMS', time: '2 hours ago', urgent: false },
+  //   { student: 'Ramesh Kumar', query: 'Assignment submission deadline extension', course: 'DSA', time: '4 hours ago', urgent: true },
+  // ];
 
-  const classPerformance = [
-    { course: 'Database Systems', attendance: 89, avgScore: 85, assignments: 8 },
-    { course: 'Data Structures', attendance: 92, avgScore: 78, assignments: 12 },
-  ];
+  // const classPerformance = [
+  //   { course: 'Database Systems', attendance: 89, avgScore: 85, assignments: 8 },
+  //   { course: 'Data Structures', attendance: 92, avgScore: 78, assignments: 12 },
+  // ];
 
   return (
     <div className="space-y-8 p-6 academic-pattern rounded-3xl animate-fade-in-up">
       {/* Welcome Section */}
-      <div className="bg-gradient-secondary rounded-3xl p-8 text-white shadow-elegant relative overflow-hidden group">
+      <div className="bg-gradient-hero rounded-3xl p-8 text-white shadow-elegant relative overflow-hidden group">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
-        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-700"></div>
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-600/30 transition-all duration-700"></div>
 
         <div className="relative flex items-center justify-between">
           <div className="flex-1">
@@ -97,7 +108,7 @@ const FacultyDashboard = () => {
               </div>
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
                 <Target className="w-5 h-5 text-secondary" />
-                <span className="text-sm font-medium">Faculty Member</span>
+                <span className="text-sm font-medium">{user?.designation || 'Faculty Member'}</span>
               </div>
             </div>
           </div>
@@ -105,9 +116,11 @@ const FacultyDashboard = () => {
             <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 text-center border border-white/20 shadow-glow min-w-[120px]">
               <QrCode className="w-10 h-10 mx-auto mb-3 text-white animate-pulse" />
               <p className="text-xs font-semibold uppercase tracking-wider text-white/60">Attendance</p>
-              <Button variant="secondary" size="sm" className="mt-2 font-black uppercase text-[10px] tracking-widest shadow-lg">
-                Start Session
-              </Button>
+              <Link to="/qr-attendance">
+                <Button variant="secondary" size="sm" className="mt-2 font-black uppercase text-[10px] tracking-widest shadow-lg">
+                  Start Session
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -126,7 +139,7 @@ const FacultyDashboard = () => {
                   <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest">{stat.label}</p>
                   <p className="text-3xl font-black mt-1 text-foreground">{stat.value}</p>
                 </div>
-                <div className={`p-3 rounded-2xl bg-gradient-secondary shadow-glow group-hover:scale-110 transition-transform duration-500`}>
+                <div className={`p-3 rounded-2xl bg-gradient-primary shadow-glow group-hover:scale-110 transition-transform duration-500`}>
                   <stat.icon className="w-6 h-6 text-white" />
                 </div>
               </div>
@@ -188,13 +201,15 @@ const FacultyDashboard = () => {
                 <MessageSquare className="w-5 h-5" />
                 Student Inquiries
               </CardTitle>
-              <Button variant="ghost" size="sm" className="hover:bg-primary hover:text-white transition-all font-bold">
-                View All
-              </Button>
+              <Link to="/student-queries">
+                <Button variant="ghost" size="sm" className="hover:bg-primary hover:text-white transition-all font-bold">
+                  View All
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {studentQueries.map((query, index) => (
+                {queries.length === 0 ? <p className="text-muted-foreground p-4">No pending inquiries.</p> : queries.map((query, index) => (
                   <div key={index} className="group relative p-5 bg-gradient-card rounded-2xl border border-border/40 hover-lift hover-glow transition-all duration-300">
                     <div className="flex items-start gap-4 mb-3">
                       <div className={`p-2 rounded-xl ${query.urgent ? 'bg-destructive/10 text-destructive animate-pulse' : 'bg-primary/10 text-primary'}`}>
@@ -230,7 +245,7 @@ const FacultyDashboard = () => {
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">
-                {classPerformance.map((item, index) => (
+                {performance.length === 0 ? <p className="text-muted-foreground">No performance data available.</p> : performance.map((item, index) => (
                   <div key={index} className="group">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="font-black text-foreground uppercase tracking-tight group-hover:text-primary transition-colors">{item.course}</h4>
@@ -288,7 +303,7 @@ const FacultyDashboard = () => {
                 </div>
                 <h3 className="font-black text-lg text-foreground mb-2 uppercase tracking-tighter">{item.label}</h3>
                 <p className="text-xs text-muted-foreground mb-6 leading-relaxed font-semibold">{item.desc}</p>
-                <div className="mt-auto flex items-center justify-center gap-2 text-primary font-black uppercase text-[10px] tracking-widest group-hover:gap-4 transition-all">
+                <div className="mt-auto inline-flex items-center justify-center gap-2 bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white px-6 py-3 rounded-xl font-black uppercase text-xs tracking-widest transition-all duration-300 group-hover:shadow-glow group-hover:gap-3">
                   {item.action}
                   <CheckCircle className="w-4 h-4" />
                 </div>

@@ -1,16 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { 
-  MessageSquare, 
-  X, 
+import {
+  MessageSquare,
+  X,
   Send,
   Phone,
   Video,
-  MoreVertical,
   Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -41,34 +40,76 @@ interface MessagePopupProps {
   conversations?: Conversation[];
 }
 
-export const MessagePopup = ({ 
-  isOpen, 
-  onClose, 
-  conversations = defaultConversations 
+export const MessagePopup = ({
+  isOpen,
+  onClose
 }: MessagePopupProps) => {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
+  const [localConversations, setLocalConversations] = useState<Conversation[]>([]);
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api";
 
-  const totalUnread = conversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
-  const activeConversation = conversations.find(conv => conv.id === selectedConversation);
+  const fetchConversations = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
 
-  const sendMessage = () => {
+      const res = await fetch(`${API_BASE}/messages/conversations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLocalConversations(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch conversations", error);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchConversations();
+    }
+  }, [isOpen]);
+
+  const totalUnread = localConversations.reduce((sum, conv) => sum + conv.unreadCount, 0);
+  const activeConversation = localConversations.find(conv => conv.id === selectedConversation);
+
+  const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation) return;
-    
-    // Here you would typically send the message to your backend
-    console.log('Sending message:', newMessage);
-    setNewMessage('');
+
+    try {
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`${API_BASE}/messages/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          recipientId: selectedConversation,
+          content: newMessage
+        })
+      });
+
+      if (res.ok) {
+        setNewMessage('');
+        fetchConversations(); // Refresh to show new message
+      }
+    } catch (error) {
+      console.error("Failed to send message", error);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end p-4 pt-20">
-      <div 
-        className="fixed inset-0 bg-black/20 backdrop-blur-sm" 
+      <div
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm"
         onClick={onClose}
       />
-      
+
       <Card className="relative w-96 h-[500px] bg-card border shadow-xl animate-slide-in-right flex flex-col">
         {selectedConversation ? (
           // Chat View
@@ -76,9 +117,9 @@ export const MessagePopup = ({
             {/* Chat Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <div className="flex items-center gap-3">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setSelectedConversation(null)}
                   className="p-1"
                 >
@@ -94,7 +135,7 @@ export const MessagePopup = ({
                   <p className="text-xs text-muted-foreground">{activeConversation?.participantRole}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" className="w-8 h-8">
                   <Phone className="w-4 h-4" />
@@ -112,7 +153,7 @@ export const MessagePopup = ({
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
                 {activeConversation?.messages.map((message) => (
-                  <div 
+                  <div
                     key={message.id}
                     className={cn(
                       "flex gap-3",
@@ -126,11 +167,11 @@ export const MessagePopup = ({
                         </AvatarFallback>
                       </Avatar>
                     )}
-                    
+
                     <div className={cn(
                       "max-w-[70%] p-3 rounded-lg text-sm",
-                      message.sender === "You" 
-                        ? "bg-primary text-primary-foreground ml-auto" 
+                      message.sender === "You"
+                        ? "bg-primary text-primary-foreground ml-auto"
                         : "bg-muted"
                     )}>
                       <p>{message.content}</p>
@@ -175,7 +216,7 @@ export const MessagePopup = ({
                   </Badge>
                 )}
               </div>
-              
+
               <Button variant="ghost" size="icon" onClick={onClose}>
                 <X className="w-4 h-4" />
               </Button>
@@ -184,14 +225,14 @@ export const MessagePopup = ({
             {/* Conversations */}
             <ScrollArea className="flex-1">
               <div className="p-2">
-                {conversations.length === 0 ? (
+                {localConversations.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
                     <p>No messages</p>
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {conversations.map((conversation) => (
+                    {localConversations.map((conversation) => (
                       <div
                         key={conversation.id}
                         className="p-3 rounded-lg border cursor-pointer transition-all hover:bg-muted/50"
@@ -203,7 +244,7 @@ export const MessagePopup = ({
                               {conversation.participant.split(' ').map(n => n[0]).join('')}
                             </AvatarFallback>
                           </Avatar>
-                          
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <h4 className="font-medium text-sm truncate">
@@ -220,11 +261,11 @@ export const MessagePopup = ({
                                 )}
                               </div>
                             </div>
-                            
+
                             <p className="text-xs text-muted-foreground mb-1">
                               {conversation.participantRole}
                             </p>
-                            
+
                             <p className="text-sm text-muted-foreground truncate">
                               {conversation.lastMessage}
                             </p>
@@ -239,9 +280,9 @@ export const MessagePopup = ({
 
             {/* Footer */}
             <div className="p-4 border-t">
-              <Button 
-                variant="outline" 
-                className="w-full" 
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => {
                   // Navigate to full messages page
                   onClose();
@@ -256,84 +297,3 @@ export const MessagePopup = ({
     </div>
   );
 };
-
-const defaultConversations: Conversation[] = [
-  {
-    id: '1',
-    participant: 'Dr. Priya Sharma',
-    participantRole: 'Computer Science Professor',
-    lastMessage: 'Please submit your assignment by tomorrow evening',
-    timestamp: '5m ago',
-    unreadCount: 2,
-    messages: [
-      {
-        id: '1-1',
-        sender: 'Dr. Priya Sharma',
-        senderRole: 'Professor',
-        content: 'Hello Arjun, I noticed you missed today\'s lecture. Please check the uploaded notes.',
-        timestamp: '2:30 PM',
-        read: true
-      },
-      {
-        id: '1-2',
-        sender: 'You',
-        senderRole: 'Student',
-        content: 'Thank you Professor. I was unwell today. I\'ll go through the notes.',
-        timestamp: '2:45 PM',
-        read: true
-      },
-      {
-        id: '1-3',
-        sender: 'Dr. Priya Sharma',
-        senderRole: 'Professor',
-        content: 'Please submit your assignment by tomorrow evening',
-        timestamp: '3:00 PM',
-        read: false
-      }
-    ]
-  },
-  {
-    id: '2',
-    participant: 'Sneha Patel',
-    participantRole: 'Classmate - CSE',
-    lastMessage: 'Can you share the lab notes from yesterday?',
-    timestamp: '1h ago',
-    unreadCount: 1,
-    messages: [
-      {
-        id: '2-1',
-        sender: 'Sneha Patel',
-        senderRole: 'Student',
-        content: 'Hey! Can you share the lab notes from yesterday?',
-        timestamp: '1:00 PM',
-        read: false
-      }
-    ]
-  },
-  {
-    id: '3',
-    participant: 'Prof. Rajesh Kumar',
-    participantRole: 'HOD - Computer Science',
-    lastMessage: 'Your scholarship application has been approved',
-    timestamp: '2h ago',
-    unreadCount: 0,
-    messages: [
-      {
-        id: '3-1',
-        sender: 'Prof. Rajesh Kumar',
-        senderRole: 'HOD',
-        content: 'Congratulations! Your scholarship application has been approved. Please visit my office for documentation.',
-        timestamp: '12:00 PM',
-        read: true
-      },
-      {
-        id: '3-2',
-        sender: 'You',
-        senderRole: 'Student',
-        content: 'Thank you so much sir! I\'ll visit your office tomorrow morning.',
-        timestamp: '12:15 PM',
-        read: true
-      }
-    ]
-  }
-];
